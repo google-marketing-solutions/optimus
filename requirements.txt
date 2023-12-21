@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-jax == 0.4.20
-ml-collections == 0.1.1
-tensorflow == 2.14.0
-flax == 0.7.5
-numpy == 1.26.1
-optax == 0.1.7
-tqdm == 4.66.1
+jax >= 0.4.20
+ml-collections >= 0.1.1
+tensorflow >= 2.14.0
+flax >= 0.7.5
+numpy >= 1.26.1
+optax >= 0.1.7
+tqdm >= 4.66.1
 orbax-checkpoint == 0.4.2
-portpicker == 1.6.0
+portpicker >= 1.5.2

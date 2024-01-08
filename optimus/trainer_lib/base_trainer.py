@@ -467,6 +467,7 @@ def restore_model_state(
     checkpoint_manager: orbax.checkpoint.CheckpointManager,
     model_state: base_agent.BaseAgentState,
     hyperparameters: config_dict.ConfigDict,
+    checkpoint_directory: str | None = None,
     transforms: Any | None = None,
     mesh: jax.sharding.Mesh | None = None,
 ) -> base_agent.BaseAgentState:
@@ -476,6 +477,9 @@ def restore_model_state(
     checkpoint_manager: An Orbax CheckpointManager for the training procedure.
     model_state: A custom model state from the already initialized model.
     hyperparameters: Training hyperparameters.
+    checkpoint_directory: A directory with saved model checkpoints. The
+      checkpoints will be loaded from this directory if both hyperparameters and
+      checkpoint_directory arguments are provided.
     transforms: Transformations to apply to checkpoint found in `directory` (see
       orbax.checkpoint.transform_utils).
     mesh: Device mesh.
@@ -503,7 +507,7 @@ def restore_model_state(
       step=checkpoint_manager.latest_step(),
       restore_kwargs=restore_keyword_arguments,
       items=model_state,
-      directory=hyperparameters.experiment_directory,
+      directory=checkpoint_directory or hyperparameters.experiment_directory,
   )
 
 
@@ -607,12 +611,16 @@ def initialize_model_state_for_prediction(
     *,
     agent: base_agent.BaseAgent,
     hyperparameters: config_dict.ConfigDict,
+    checkpoint_directory: str | None = None,
 ) -> base_agent.BaseAgentState:
   """Returns a model state initialized for prediction.
 
   Args:
     agent: A training agent.
     hyperparameters: Training hyperparameters.
+    checkpoint_directory: A directory with saved model checkpoints. The
+      checkpoints will be loaded from this directory if both hyperparameters and
+      checkpoint_directory arguments are provided.
   """
   rng_key = jax.random.PRNGKey(hyperparameters.training_rng_seed)
   initialization_rng_key, _ = jax.random.split(rng_key, 2)
@@ -645,6 +653,7 @@ def initialize_model_state_for_prediction(
         checkpoint_manager=checkpoint_manager,
         model_state=model_state,
         hyperparameters=hyperparameters,
+        checkpoint_directory=checkpoint_directory,
     )
   return model_state
 

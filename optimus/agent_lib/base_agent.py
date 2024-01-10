@@ -16,7 +16,7 @@
 
 import abc
 import dataclasses
-from typing import Any, Callable, Mapping, Protocol
+from typing import Any, Callable, Final, Mapping, Protocol
 import flax
 from flax.core import frozen_dict
 from flax.training import train_state
@@ -24,7 +24,7 @@ import jax
 import jax.numpy as jnp
 from ml_collections.config_dict import config_dict
 
-
+_EPSILON: Final[float] = 1e-8
 FrozenDict = frozen_dict.FrozenDict
 
 
@@ -190,16 +190,24 @@ class BaseAgent(metaclass=abc.ABCMeta):
         prng_key=jax.random.PRNGKey(prediction_seed),
         probabilities=jnp.exp(log_probabilities).flatten(),
     )
+    log_probabilities = jnp.take(log_probabilities, predicted_action)
+    attentive_transformer_loss = jnp.asarray(
+        attentive_transformer_loss
+    ).reshape(1, 1)
+    if self.hyperparameters.replace_nans_in_prediction:
+      value = jnp.nan_to_num(value, nan=_EPSILON)
+      log_probabilities = jnp.nan_to_num(log_probabilities, nan=_EPSILON)
+      attentive_transformer_loss = jnp.nan_to_num(
+          attentive_transformer_loss, nan=_EPSILON
+      )
     return PredictionOutput(
         prediction_seed=prediction_seed,
         state=batch,
         action=predicted_action,
         value=value,
-        log_probability=jnp.take(log_probabilities, predicted_action),
+        log_probability=log_probabilities,
         done=jnp.repeat(True, 1).reshape(1, 1),
-        attentive_transformer_loss=jnp.asarray(
-            attentive_transformer_loss
-        ).reshape(1, 1),
+        attentive_transformer_loss=attentive_transformer_loss,
     )
 
   def evaluate_predict(

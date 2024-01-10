@@ -53,6 +53,7 @@ DEFAULT_HYPERPARAMETERS = config_dict.ConfigDict(
         independent_decoder_layers=1,
         model_data_type="float32",
         agent_name="tabnet",
+        replace_nans_in_prediction=True,
     )
 )
 

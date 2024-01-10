@@ -50,6 +50,7 @@ _TEST_TABNET_HYPERPARAMETERS = config_dict.ConfigDict(
         entropy_coefficient=0.02,
         lambda_sparse=1e-3,
         action_space_length=1,
+        replace_nans_in_prediction=True,
     )
 )
 

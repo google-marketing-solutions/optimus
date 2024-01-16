@@ -424,12 +424,17 @@ def initialize_tensorboard_writer(
 
 
 def initialize_checkpointing(
-    *, hyperparameters: config_dict.ConfigDict
+    *,
+    hyperparameters: config_dict.ConfigDict,
+    checkpoint_directory: str | None = None,
 ) -> tuple[orbax.checkpoint.CheckpointManager, int]:
   """Returns an Orbax CheckpointManager and the latest training step.
 
   Args:
     hyperparameters: Training hyperparameters.
+    checkpoint_directory: A directory with saved model checkpoints. The
+      checkpoints will be loaded from this directory if both hyperparameters and
+      checkpoint_directory arguments are provided.
   """
   checkpoint_manager_options = orbax.checkpoint.CheckpointManagerOptions(
       save_interval_steps=hyperparameters.checkpoint_frequency,
@@ -441,7 +446,7 @@ def initialize_checkpointing(
       orbax.checkpoint.PyTreeCheckpointHandler()
   )
   checkpoint_manager = orbax.checkpoint.CheckpointManager(
-      directory=hyperparameters.experiment_directory,
+      directory=checkpoint_directory or hyperparameters.experiment_directory,
       checkpointers=async_checkpointer,
       options=checkpoint_manager_options,
   )

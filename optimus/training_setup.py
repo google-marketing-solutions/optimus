@@ -1,4 +1,4 @@
-# Copyright 2023 Google LLC.
+# Copyright 2024 Google LLC.
 #
 # Licensed under the MIT License;
 # you may not use this file except in compliance with the License.
@@ -13,11 +13,9 @@
 # limitations under the License.
 
 """Utility functions for the train operation."""
-import datetime
 import itertools
 import json
 import os
-import pathlib
 from typing import Any, Final, Mapping, Sequence
 
 from absl import logging
@@ -352,7 +350,8 @@ def build_hyperparameters(
     reward_hyperparameters: config_dict.ConfigDict,
     data_pipeline_hyperparameters: config_dict.ConfigDict,
     trainer_hyperparameters: config_dict.ConfigDict,
-    experiment_directory: str,
+    checkpoint_directory: str,
+    artifact_directory: str,
     hyperparameters_file: str | None = None,
     hyperparameters_overrides: str | None = None,
 ) -> config_dict.ConfigDict:
@@ -369,7 +368,10 @@ def build_hyperparameters(
       hyperparameters and values.
     trainer_hyperparameters: A mapping between trainer class hyperparameters and
       values.
-    experiment_directory: A path to the experiment directory.
+    checkpoint_directory: A path to the directory where model checkpoints
+      will be saved.
+    artifact_directory: A path to the directory where all the training artifacts
+      (e.g. TensorBoard logs) will be saved.
     hyperparameters_file: A path to the file with hyperparameters overrides.
     hyperparameters_overrides: A JSON string with hyperparameters overrides.
 
@@ -385,7 +387,8 @@ def build_hyperparameters(
   )
   experiment_hyperparameters = core_hyperparameters + (
       {
-          "experiment_directory": experiment_directory,
+          "checkpoint_directory": checkpoint_directory,
+          "artifact_directory": artifact_directory,
       },
   )
   experiment_hyperparameters = _merge_hyperparameters(
@@ -410,30 +413,6 @@ def build_hyperparameters(
   )
 
 
-def set_experiment_directory(*, experiment_directory: str | None) -> str:
-  """Sets up and create up directory.
-
-  Args:
-    experiment_directory: A path to the experiment directory or None.
-
-  Returns:
-    A path to the experiment directory. If None, then the directory will be
-    created automatically.
-  """
-  if not experiment_directory:
-    experiment_directory = (
-        pathlib.Path.home()
-        / "experiment"
-        / datetime.datetime.today().strftime("optimus_%d%m%Y%H%M%S")
-    )
-    experiment_directory = str(experiment_directory)
-
-  if not tf.io.gfile.exists(experiment_directory):
-    tf.io.gfile.makedirs(experiment_directory)
-
-  return experiment_directory
-
-
 def _get_model_data_type_from_string(*, model_data_type: str) -> jnp.dtype:
   """Maps a string with a jax.numpy dtype."""
   if model_data_type not in ("float32", "float64"):
@@ -448,7 +427,8 @@ def set_hyperparameters(
     reward_hyperparameters: config_dict.ConfigDict,
     data_pipeline_hyperparameters: config_dict.ConfigDict,
     trainer_hyperparameters: config_dict.ConfigDict,
-    experiment_directory: str,
+    checkpoint_directory: str,
+    artifact_directory: str,
     hyperparameters_file: str | None = None,
     hyperparameters_overrides: str | None = None,
 ) -> config_dict.ConfigDict:
@@ -465,7 +445,10 @@ def set_hyperparameters(
       hyperparameters and values.
     trainer_hyperparameters: A mapping between trainer class hyperparameters and
       values.
-    experiment_directory: A path to the experiment directory.
+    checkpoint_directory: A path to the directory where model checkpoints
+      will be saved.
+    artifact_directory: A path to the directory where all the training artifacts
+      (e.g. TensorBoard logs) will be saved.
     hyperparameters_file: A path to the file with hyperparameters overrides.
     hyperparameters_overrides: A JSON string with hyperparameters overrides.
 
@@ -478,13 +461,14 @@ def set_hyperparameters(
       reward_hyperparameters=reward_hyperparameters,
       data_pipeline_hyperparameters=data_pipeline_hyperparameters,
       trainer_hyperparameters=trainer_hyperparameters,
-      experiment_directory=experiment_directory,
+      checkpoint_directory=checkpoint_directory,
+      artifact_directory=artifact_directory,
       hyperparameters_file=hyperparameters_file,
       hyperparameters_overrides=hyperparameters_overrides,
   )
   logging.info("Experiment hyperparameters are: %s", hyperparameters)
   hyperparameters_path = os.path.join(
-      hyperparameters.experiment_directory, "hyperparameters.json"
+      hyperparameters.artifact_directory, "hyperparameters.json"
   )
   with tf.io.gfile.GFile(hyperparameters_path, "w") as f:
     json.dump(hyperparameters.to_dict(), f)

@@ -417,7 +417,7 @@ def initialize_tensorboard_writer(
     hyperparameters: Training hyperparameters.
   """
   tensorboard_writer = tensorboard.SummaryWriter(
-      hyperparameters.experiment_directory
+      hyperparameters.artifact_directory
   )
   tensorboard_writer.hparams(hyperparameters.to_dict())
   return tensorboard_writer
@@ -426,15 +426,11 @@ def initialize_tensorboard_writer(
 def initialize_checkpointing(
     *,
     hyperparameters: config_dict.ConfigDict,
-    checkpoint_directory: str | None = None,
 ) -> tuple[orbax.checkpoint.CheckpointManager, int]:
   """Returns an Orbax CheckpointManager and the latest training step.
 
   Args:
     hyperparameters: Training hyperparameters.
-    checkpoint_directory: A directory with saved model checkpoints. The
-      checkpoints will be loaded from this directory if both hyperparameters and
-      checkpoint_directory arguments are provided.
   """
   checkpoint_manager_options = orbax.checkpoint.CheckpointManagerOptions(
       save_interval_steps=hyperparameters.checkpoint_frequency,
@@ -446,7 +442,7 @@ def initialize_checkpointing(
       orbax.checkpoint.PyTreeCheckpointHandler()
   )
   checkpoint_manager = orbax.checkpoint.CheckpointManager(
-      directory=checkpoint_directory or hyperparameters.experiment_directory,
+      directory=hyperparameters.checkpoint_directory,
       checkpointers=async_checkpointer,
       options=checkpoint_manager_options,
   )
@@ -454,7 +450,7 @@ def initialize_checkpointing(
   if not latest_training_step:
     logging.info(
         "No checkpoint found under %s.",
-        hyperparameters.experiment_directory,
+        hyperparameters.checkpoint_directory,
     )
     latest_training_step = 0
   else:
@@ -472,7 +468,6 @@ def restore_model_state(
     checkpoint_manager: orbax.checkpoint.CheckpointManager,
     model_state: base_agent.BaseAgentState,
     hyperparameters: config_dict.ConfigDict,
-    checkpoint_directory: str | None = None,
     transforms: Any | None = None,
     mesh: jax.sharding.Mesh | None = None,
 ) -> base_agent.BaseAgentState:
@@ -482,9 +477,6 @@ def restore_model_state(
     checkpoint_manager: An Orbax CheckpointManager for the training procedure.
     model_state: A custom model state from the already initialized model.
     hyperparameters: Training hyperparameters.
-    checkpoint_directory: A directory with saved model checkpoints. The
-      checkpoints will be loaded from this directory if both hyperparameters and
-      checkpoint_directory arguments are provided.
     transforms: Transformations to apply to checkpoint found in `directory` (see
       orbax.checkpoint.transform_utils).
     mesh: Device mesh.
@@ -512,7 +504,7 @@ def restore_model_state(
       step=checkpoint_manager.latest_step(),
       restore_kwargs=restore_keyword_arguments,
       items=model_state,
-      directory=checkpoint_directory or hyperparameters.experiment_directory,
+      directory=hyperparameters.checkpoint_directory,
   )
 
 
@@ -616,16 +608,12 @@ def initialize_model_state_for_prediction(
     *,
     agent: base_agent.BaseAgent,
     hyperparameters: config_dict.ConfigDict,
-    checkpoint_directory: str | None = None,
 ) -> base_agent.BaseAgentState:
   """Returns a model state initialized for prediction.
 
   Args:
     agent: A training agent.
     hyperparameters: Training hyperparameters.
-    checkpoint_directory: A directory with saved model checkpoints. The
-      checkpoints will be loaded from this directory if both hyperparameters and
-      checkpoint_directory arguments are provided.
   """
   rng_key = jax.random.PRNGKey(hyperparameters.training_rng_seed)
   initialization_rng_key, _ = jax.random.split(rng_key, 2)
@@ -658,7 +646,6 @@ def initialize_model_state_for_prediction(
         checkpoint_manager=checkpoint_manager,
         model_state=model_state,
         hyperparameters=hyperparameters,
-        checkpoint_directory=checkpoint_directory,
     )
   return model_state
 

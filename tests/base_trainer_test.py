@@ -15,6 +15,7 @@
 """Tests for utility functions in base_trainer.py."""
 
 import functools
+import os
 
 from absl.testing import absltest
 from absl.testing import parameterized
@@ -239,10 +240,12 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -392,10 +395,12 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -408,10 +413,12 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -440,10 +447,12 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -519,10 +528,12 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -536,10 +547,12 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -554,10 +567,12 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -578,7 +593,9 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     self.assertTrue(
         any(
             item.startswith("events")
-            for item in tf.io.gfile.listdir(experiment_directory)
+            for item in tf.io.gfile.listdir(
+                os.path.join(directory, "artifacts")
+            )
         )
     )
 
@@ -586,10 +603,12 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -631,10 +650,12 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -688,10 +709,12 @@ class BaseTrainerTests(absltest.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -725,10 +748,12 @@ class BaseTrainerTests(absltest.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -769,10 +794,12 @@ class BaseTrainerTests(absltest.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -813,10 +840,12 @@ class BaseTrainerTests(absltest.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -857,10 +886,12 @@ class BaseTrainerTests(absltest.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_TRAINER_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )

@@ -13,12 +13,10 @@
 # limitations under the License.
 
 """Tests for utility functions in training_setup.py."""
-import os
 
 from absl.testing import absltest
 from absl.testing import parameterized
 import pandas as pd
-import tensorflow as tf
 
 from optimus import training_setup
 
@@ -33,17 +31,6 @@ class TrainingSetupTests(parameterized.TestCase):
         dataframe=dataframe, categorical_column_names=["b",]
     )
     self.assertEqual(actual_output, {"b": 2})
-
-  def test_set_experiment_directory(self):
-    experiment_directory = self.create_tempdir().full_path
-    folder_one_path = os.path.join(experiment_directory, "experiment_directory")
-    tf.io.gfile.makedirs(folder_one_path)
-    self.assertEqual(
-        training_setup.set_experiment_directory(
-            experiment_directory=folder_one_path
-        ),
-        folder_one_path,
-    )
 
   @parameterized.named_parameters(
       dict(

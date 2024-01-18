@@ -15,6 +15,7 @@
 """Tests for utility functions in base_agent.py."""
 
 import functools
+import os
 
 from absl.testing import absltest
 import flax.linen as nn
@@ -247,10 +248,12 @@ class BaseAgentTests(absltest.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_AGENT_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )
@@ -277,10 +280,12 @@ class BaseAgentTests(absltest.TestCase):
     modified_hyperparameters_dictionary = (
         _TEST_BASE_AGENT_HYPERPARAMETERS.to_dict()
     )
-    experiment_directory = self.create_tempdir().full_path
-    modified_hyperparameters_dictionary["experiment_directory"] = (
-        experiment_directory
+    directory = self.create_tempdir().full_path
+    modified_paths = dict(
+        checkpoint_directory=os.path.join(directory, "checkpoints"),
+        artifact_directory=os.path.join(directory, "artifacts"),
     )
+    modified_hyperparameters_dictionary.update(modified_paths)
     modified_hyperparameters = config_dict.ConfigDict(
         modified_hyperparameters_dictionary
     )

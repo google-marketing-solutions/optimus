@@ -22,7 +22,6 @@ from absl import logging
 import jax
 import jax.numpy as jnp
 from ml_collections.config_dict import config_dict
-import pandas as pd
 import portpicker
 import tensorflow as tf
 
@@ -35,50 +34,6 @@ _NESTED_HYPERPARAMETERS = (
     "learning_rate_hyperparameters",
     "exploration_exploitation_hyperparameters",
 )
-
-
-def create_mapping_for_categorical_dimensions(
-    *,
-    dataframe: pd.DataFrame,
-    categorical_column_names: Sequence[str],
-) -> Mapping[str, int]:
-  """Returns a mapping of categorical columns and their dimensionalities.
-
-  Args:
-    dataframe: A dataframe with all the contextual data.
-    categorical_column_names: A sequence with categorical column names.
-  """
-  categorical_dimensions = {}
-  for column in dataframe[categorical_column_names]:
-    categorical_dimensions[column] = dataframe[column].nunique()
-  return categorical_dimensions
-
-
-def get_categorical_dimensions_and_indexes(
-    *,
-    columns: tuple[str, ...],
-    categorical_columns: tuple[str, ...],
-    categorical_dimensions: dict[str, int],
-) -> tuple[tuple[int, ...], tuple[int, ...]]:
-  """Lists categorical dimensions and indexes.
-
-  Args:
-    columns: Column names in the input dataset.
-    categorical_columns: Categorical column names in the input dataset.
-    categorical_dimensions: A mapping between categorical column names and their
-      respective dimensionality.
-
-  Returns:
-    Categorical indices and dimensions of each categorical column.
-  """
-  categorical_indexes = tuple(
-      [i for i, f in enumerate(columns) if f in categorical_columns]
-  )
-  categorical_dimensions = tuple(
-      [categorical_dimensions[f] for f in columns if f in categorical_columns]
-  )
-
-  return categorical_indexes, categorical_dimensions
 
 
 def _verify_action_hyperparameters(
@@ -103,98 +58,6 @@ def _verify_action_hyperparameters(
     hyperparameters["action_space_length"] = (
         1 if single_task_training else len(action_space)
     )
-  return hyperparameters
-
-
-def _check_categorical_dimensions_indexes_types(
-    *,
-    hyperparameters: config_dict.ConfigDict,
-) -> bool:
-  """Checks data types of select hyperparameters.
-
-  Args:
-    hyperparameters: Experiment hyperparameters.
-
-  Returns:
-    Indication if select hyperparameters are tuple.
-  """
-  if (
-      not hyperparameters.categorical_dimensions
-      or not hyperparameters.categorical_indexes
-  ):
-    return False
-  categorical_dims_tuple = isinstance(
-      hyperparameters.categorical_dimensions, tuple
-  )
-  categorical_indx_tuple = isinstance(
-      hyperparameters.categorical_indexes, tuple
-  )
-  categorical_dims_elems_int = all(
-      isinstance(i, int) for i in hyperparameters.categorical_dimensions
-  )
-  categorical_indx_elems_int = all(
-      isinstance(i, int) for i in hyperparameters.categorical_indexes
-  )
-  return (
-      categorical_dims_tuple
-      and categorical_indx_tuple
-      and categorical_dims_elems_int
-      and categorical_indx_elems_int
-  )
-
-
-def _verify_data_pipeline_hyperparameters(
-    *,
-    hyperparameters: config_dict.ConfigDict,
-) -> config_dict.ConfigDict:
-  """Verifies if all the required data pipeline hyperparameters are present.
-
-  Args:
-    hyperparameters: Experiment hyperparameters.
-
-  Returns:
-    Verified pipeline hyperparameters.
-
-  Raises:
-    ValueError: An error when columns, categorical_columns and
-    categorical_dimensions hyperparameters are not provided.
-  """
-  preconditions_satisfied = _check_categorical_dimensions_indexes_types(
-      hyperparameters=hyperparameters
-  )
-  if preconditions_satisfied:
-    return hyperparameters
-  else:
-    logging.info(
-        "Incorrect hyperparameters for categorical_dimensions and/or "
-        "categorical_indexes. Attempting to assign them based on "
-        "columns, categorical_columns and categorical_dimensions."
-    )
-    if not hyperparameters.columns:
-      raise ValueError(
-          f" You need to specify columns, received: {hyperparameters.columns}."
-      )
-    if (
-        hyperparameters.categorical_columns
-        and not hyperparameters.categorical_dimensions
-    ):
-      raise ValueError(
-          "You need to specify a dictionary with categorical dimensions per"
-          " each cateogrical column if you specified any categorical_columns,"
-          f" received: {hyperparameters.categorical_dimensions}."
-      )
-    categorical_indexes, categorical_dimensions = (
-        get_categorical_dimensions_and_indexes(
-            columns=hyperparameters.columns,
-            categorical_columns=hyperparameters.categorical_columns,
-            categorical_dimensions=hyperparameters.categorical_dimensions,
-        )
-    )
-  with hyperparameters.unlocked():
-    del hyperparameters["categorical_indexes"]
-    hyperparameters["categorical_indexes"] = categorical_indexes
-    del hyperparameters["categorical_dimensions"]
-    hyperparameters["categorical_dimensions"] = categorical_dimensions
   return hyperparameters
 
 
@@ -403,9 +266,6 @@ def build_hyperparameters(
       file_overrides=hyperparameters_file,
   )
   experiment_hyperparameters = _verify_action_hyperparameters(
-      hyperparameters=experiment_hyperparameters
-  )
-  experiment_hyperparameters = _verify_data_pipeline_hyperparameters(
       hyperparameters=experiment_hyperparameters
   )
   return _verify_trainer_hyperparameters(

@@ -16,21 +16,11 @@
 
 from absl.testing import absltest
 from absl.testing import parameterized
-import pandas as pd
 
 from optimus import training_setup
 
 
 class TrainingSetupTests(parameterized.TestCase):
-
-  def test_create_mapping_for_categorical_dimensions(self):
-    dataframe = pd.DataFrame.from_records(
-        [{"a": 0.1, "b": 0}, {"a": 0.2, "b": 1}]
-    )
-    actual_output = training_setup.create_mapping_for_categorical_dimensions(
-        dataframe=dataframe, categorical_column_names=["b",]
-    )
-    self.assertEqual(actual_output, {"b": 2})
 
   @parameterized.named_parameters(
       dict(

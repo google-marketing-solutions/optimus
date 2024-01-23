@@ -28,9 +28,7 @@ AUTOTUNE = tf.data.experimental.AUTOTUNE
 DEFAULT_HYPERPARAMETERS = config_dict.ConfigDict(
     dict(
         input_dimensions=config_dict.placeholder(int),
-        columns=config_dict.placeholder(list),
-        categorical_columns=config_dict.placeholder(list),
-        categorical_dimensions=config_dict.placeholder(dict),
+        categorical_dimensions=config_dict.placeholder(list),
         categorical_indexes=config_dict.placeholder(list),
         shuffle_size=512,
         batch_size=1024,

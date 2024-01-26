@@ -103,5 +103,13 @@ class BasePreprocessingTests(parameterized.TestCase):
     with self.assertRaisesRegex(ValueError, "are not present"):
       _ = base_preprocessor.categorical_columns
 
+  def test_categorical_columns_indexes(self):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        dataframe=_TEST_DATAFRAME,
+        override_categorical_columns=["a"],
+    )
+    self.assertEqual(base_preprocessor.categorical_columns_indexes, [0])
+
+
 if __name__ == "__main__":
   absltest.main()

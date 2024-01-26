@@ -104,6 +104,7 @@ class BaseDataPreprocessor:
       column will be classified as categorical. All the other columns will be
       understood as numerical.
     categorical_columns: A sequence with categorical column names.
+    categorical_columns_indexes: A sequence with categorical column indexes.
   """
 
   def __init__(
@@ -162,3 +163,11 @@ class BaseDataPreprocessor:
         dataframe=self.dataframe, categorical_columns=categorical_columns
     )
     return categorical_columns
+
+  @functools.cached_property
+  def categorical_columns_indexes(self) -> Sequence[int]:
+    """Returns a sequence with categorical column indexes."""
+    return [
+        self.dataframe.columns.tolist().index(categorical_column)
+        for categorical_column in self.categorical_columns
+    ]

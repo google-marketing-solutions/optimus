@@ -14,8 +14,9 @@
 
 """Base preprocessing class."""
 import functools
-import json
+import pickle
 from typing import Final, List, Mapping, Sequence
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 
@@ -137,6 +138,14 @@ class BaseDataPreprocessor:
       their unique values.
     categorical_columns_dimensions: A seuqnce with the number of unique values
       per categorical column
+    categories_mappings: A mapping of categorical columns to mappings of their
+      unique values and representative integers.
+    preprocessed_array: An array with all the preprocessed dataframe values.
+    minimum_categorical_encoding_value: A minimum numerical value to use for
+      encoding. I.e. if 1 then the encoded values will begin at 1 and and on
+      number_of_unique_values + 1.
+    unknown_categorical_encoding_value: An integer to use when trying to encode
+      an unknown categorical value.
   """
 
   def __init__(
@@ -150,6 +159,12 @@ class BaseDataPreprocessor:
           Mapping[str | int, Sequence[str | int]] | None
       ) = None,
       categorical_columns_unique_values_path: str | None = None,
+      override_categorical_columns_encoding_mapping: (
+          Mapping[str | int, Mapping[str | int, int]] | None
+      ) = None,
+      categorical_columns_encoding_mapping_path: str | None = None,
+      minimum_categorical_encoding_value: int = 1,
+      unknown_categorical_encoding_value: int = -1,
   ):
     """Initializes the BaseDataPreprocessor class.
 
@@ -163,10 +178,20 @@ class BaseDataPreprocessor:
         be understood as numerical.
       override_categorical_columns_unique_values: A mapping between column names
         and their unique values.
-      categorical_columns_unique_values_path: A path to a JSON file with a
+      categorical_columns_unique_values_path: A path to a pickle file with a
         mapping between column names and their unique values. The
         `override_categorical_columns_unique_values` argument has priority if
         both are provided.
+      override_categorical_columns_encoding_mapping: A mapping of categorical
+        column names to mappings between their unique and encoded values.
+      categorical_columns_encoding_mapping_path: A path to a pickle file with a
+        mapping of categorical columns to mappings of their unique values and
+        representative integers.
+      minimum_categorical_encoding_value: A minimum numerical value to use for
+        encoding. I.e. if 1 then the encoded values will begin at 1 and and on
+        number_of_unique_values + 1.
+      unknown_categorical_encoding_value: An integer to use when trying to
+        encode an unknown categorical value.
     """
     self.dataframe = (
         dataframe.drop(columns=skip_columns, inplace=False)
@@ -181,6 +206,14 @@ class BaseDataPreprocessor:
     self._categorical_columns_unique_values_path = (
         categorical_columns_unique_values_path
     )
+    self._override_categorical_columns_encoding_mapping = (
+        override_categorical_columns_encoding_mapping
+    )
+    self._categorical_columns_encoding_mapping_path = (
+        categorical_columns_encoding_mapping_path
+    )
+    self.minimum_categorical_encoding_value = minimum_categorical_encoding_value
+    self.unknown_categorical_encoding_value = unknown_categorical_encoding_value
 
   @functools.cached_property
   def categorical_columns(self) -> Sequence[str | int]:
@@ -235,7 +268,7 @@ class BaseDataPreprocessor:
       with tf.io.gfile.GFile(
           self._categorical_columns_unique_values_path, "rb"
       ) as artifact:
-        mapping = json.load(artifact)
+        mapping = pickle.load(artifact)
         verify_override_mapping(
             mapping=mapping, categorical_columns=self.categorical_columns
         )
@@ -255,3 +288,58 @@ class BaseDataPreprocessor:
         len(self.categorical_columns_unique_values[categorical_column])
         for categorical_column in self.categorical_columns
     ]
+
+  @functools.cached_property
+  def categories_mappings(
+      self,
+  ) -> Mapping[str | int, Mapping[str | int, int]]:
+    """Returns a mapping of categorical columns, unique and encoded values."""
+    if self._override_categorical_columns_encoding_mapping:
+      verify_override_mapping(
+          mapping=self._override_categorical_columns_encoding_mapping,
+          categorical_columns=self.categorical_columns,
+      )
+      return self._override_categorical_columns_encoding_mapping
+    if self._categorical_columns_encoding_mapping_path:
+      with tf.io.gfile.GFile(
+          self._categorical_columns_encoding_mapping_path, "rb"
+      ) as artifact:
+        mapping = pickle.load(artifact)
+        verify_override_mapping(
+            mapping=mapping, categorical_columns=self.categorical_columns
+        )
+        return mapping
+    partial_create_category_to_number_mapping = functools.partial(
+        create_category_to_number_mapping,
+        minimum_categorical_encoding_value=self.minimum_categorical_encoding_value,
+    )
+    return {
+        key: partial_create_category_to_number_mapping(
+            category_unique_values=values,
+        )
+        for key, values in self.categorical_columns_unique_values.items()
+    }
+
+  @functools.cached_property
+  def _encoded_categorical_columns(self) -> np.ndarray:
+    """Returns an array with encoded categorical values from the dataframe."""
+    vectorized_encoder = np.vectorize(
+        functools.partial(
+            encode_categorical_value,
+            category_mapping=self.categories_mappings,
+            unknown_categorical_encoding_value=self.unknown_categorical_encoding_value,
+        )
+    )
+    return vectorized_encoder(
+        row_value=self.dataframe[self.categorical_columns].values,
+        column_name=self.categorical_columns,
+    )
+
+  @functools.cached_property
+  def preprocessed_array(self) -> np.ndarray:
+    """Returns an array with all the preprocessed dataframe values."""
+    data_array = self.dataframe.to_numpy()
+    data_array[:, self.categorical_columns_indexes] = (
+        self._encoded_categorical_columns
+    )
+    return data_array.astype(np.float32)

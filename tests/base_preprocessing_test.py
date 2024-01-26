@@ -13,10 +13,13 @@
 # limitations under the License.
 
 """Tests for utility functions in base_preprocessing.py."""
+import json
+import os
 from absl.testing import absltest
 from absl.testing import parameterized
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from optimus.preprocessing_lib import base_preprocessing
 
 _TEST_DATAFRAME = pd.DataFrame({
@@ -109,6 +112,57 @@ class BasePreprocessingTests(parameterized.TestCase):
         override_categorical_columns=["a"],
     )
     self.assertEqual(base_preprocessor.categorical_columns_indexes, [0])
+
+  def test_verify_override_mapping(self):
+    with self.assertRaisesRegex(ValueError, "columns mappings must have keys"):
+      base_preprocessing.verify_override_mapping(
+          mapping={"a": [1, 3], "b": [4, 6]},
+          categorical_columns=["a", "b", "c"],
+      )
+
+  def test_categorical_columns_unique_values_from_file(self):
+    mapping = {"a": [1, 3], "b": [4, 6]}
+    file_path = os.path.join(self.create_tempdir().full_path, "mapping.json")
+    with tf.io.gfile.GFile(file_path, "wb") as file:
+      json.dump(mapping, file)
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        dataframe=_TEST_DATAFRAME,
+        categorical_columns_unique_values_path=file_path,
+        override_categorical_columns=["a", "b"],
+    )
+    self.assertEqual(
+        base_preprocessor.categorical_columns_unique_values, mapping
+    )
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name="override_categorical_columns_unique_values",
+          override_categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
+      ),
+      dict(
+          testcase_name="no_override_categorical_columns_unique_values",
+          override_categorical_columns_unique_values=None,
+      ),
+  )
+  def test_categorical_columns_unique_values(
+      self, override_categorical_columns_unique_values
+  ):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        dataframe=_TEST_DATAFRAME,
+        override_categorical_columns_unique_values=override_categorical_columns_unique_values,
+        override_categorical_columns=["a", "b"],
+    )
+    self.assertEqual(
+        base_preprocessor.categorical_columns_unique_values,
+        {"a": [1, 3], "b": [4, 6]},
+    )
+
+  def test_categorical_columns_dimensions(self):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        dataframe=_TEST_DATAFRAME,
+        override_categorical_columns=["a"],
+    )
+    self.assertEqual(base_preprocessor.categorical_columns_dimensions, [2])
 
 
 if __name__ == "__main__":

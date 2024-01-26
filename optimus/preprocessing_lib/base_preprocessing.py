@@ -14,8 +14,10 @@
 
 """Base preprocessing class."""
 import functools
+import json
 from typing import Final, List, Mapping, Sequence
 import pandas as pd
+import tensorflow as tf
 
 _NON_NUMERICAL_PANDAS_DTYPES: Final[List[str]] = [
     "object",
@@ -95,6 +97,32 @@ def verify_numerical_columns(
     )
 
 
+def verify_override_mapping(
+    *,
+    mapping: (
+        Mapping[str | int, Sequence[str | int]]
+        | Mapping[str | int, Mapping[str | int, int]]
+    ),
+    categorical_columns: Sequence[str | int],
+) -> None:
+  """Verifies that the mapping has keys represeting each categorical column.
+
+  Args:
+    mapping: A mapping between categorical columns and their unique values. Or a
+      mapping of categorical columns to mappings of their unique values and
+      representative integers.
+    categorical_columns: A sequence with categorical column names.
+  """
+  all_categorical_columns = mapping.keys()
+  if set(all_categorical_columns) != set(categorical_columns):
+    raise ValueError(
+        "Categorical columns mappings must have keys representing each"
+        " categorical column. Currently the keys are"
+        f" {all_categorical_columns} and the categorical columns are"
+        f" {categorical_columns}."
+    )
+
+
 class BaseDataPreprocessor:
   """A class to preprocess a dataframe before using it with Optimus.
 
@@ -105,6 +133,10 @@ class BaseDataPreprocessor:
       understood as numerical.
     categorical_columns: A sequence with categorical column names.
     categorical_columns_indexes: A sequence with categorical column indexes.
+    categorical_columns_unique_values: A mapping between categorical columns and
+      their unique values.
+    categorical_columns_dimensions: A seuqnce with the number of unique values
+      per categorical column
   """
 
   def __init__(
@@ -114,6 +146,10 @@ class BaseDataPreprocessor:
       skip_columns: Sequence[str | int] | None = None,
       override_categorical_columns: Sequence[str | int] | None = None,
       categorical_column_threshold: int = 200,
+      override_categorical_columns_unique_values: (
+          Mapping[str | int, Sequence[str | int]] | None
+      ) = None,
+      categorical_columns_unique_values_path: str | None = None,
   ):
     """Initializes the BaseDataPreprocessor class.
 
@@ -125,6 +161,12 @@ class BaseDataPreprocessor:
       categorical_column_threshold: A number of unique column values below which
         a column will be classified as categorical. All the other columns will
         be understood as numerical.
+      override_categorical_columns_unique_values: A mapping between column names
+        and their unique values.
+      categorical_columns_unique_values_path: A path to a JSON file with a
+        mapping between column names and their unique values. The
+        `override_categorical_columns_unique_values` argument has priority if
+        both are provided.
     """
     self.dataframe = (
         dataframe.drop(columns=skip_columns, inplace=False)
@@ -133,6 +175,12 @@ class BaseDataPreprocessor:
     )
     self._override_categorical_columns = override_categorical_columns
     self.categorical_column_threshold = categorical_column_threshold
+    self._override_categorical_columns_unique_values = (
+        override_categorical_columns_unique_values
+    )
+    self._categorical_columns_unique_values_path = (
+        categorical_columns_unique_values_path
+    )
 
   @functools.cached_property
   def categorical_columns(self) -> Sequence[str | int]:
@@ -169,5 +217,41 @@ class BaseDataPreprocessor:
     """Returns a sequence with categorical column indexes."""
     return [
         self.dataframe.columns.tolist().index(categorical_column)
+        for categorical_column in self.categorical_columns
+    ]
+
+  @functools.cached_property
+  def categorical_columns_unique_values(
+      self,
+  ) -> Mapping[str | int, Sequence[str | int]]:
+    """Returns a mapping between categorical columns and their unique values."""
+    if self._override_categorical_columns_unique_values:
+      verify_override_mapping(
+          mapping=self._override_categorical_columns_unique_values,
+          categorical_columns=self.categorical_columns,
+      )
+      return self._override_categorical_columns_unique_values
+    elif self._categorical_columns_unique_values_path:
+      with tf.io.gfile.GFile(
+          self._categorical_columns_unique_values_path, "rb"
+      ) as artifact:
+        mapping = json.load(artifact)
+        verify_override_mapping(
+            mapping=mapping, categorical_columns=self.categorical_columns
+        )
+        return mapping
+    categorical_dataframe = self.dataframe[self.categorical_columns].astype(
+        "category"
+    )
+    return {
+        column_name: column_values.cat.categories.values.tolist()
+        for column_name, column_values in categorical_dataframe.items()
+    }
+
+  @functools.cached_property
+  def categorical_columns_dimensions(self) -> Sequence[int]:
+    """Returns the number of unique values per categorical column."""
+    return [
+        len(self.categorical_columns_unique_values[categorical_column])
         for categorical_column in self.categorical_columns
     ]

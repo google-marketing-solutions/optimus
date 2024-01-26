@@ -13,7 +13,18 @@
 # limitations under the License.
 
 """Base preprocessing class."""
-from typing import Mapping, Sequence
+import functools
+from typing import Final, List, Mapping, Sequence
+import pandas as pd
+
+_NON_NUMERICAL_PANDAS_DTYPES: Final[List[str]] = [
+    "object",
+    "bool",
+    "datetime",
+    "timedelta",
+    "category",
+    "datetimetz",
+]
 
 
 def create_category_to_number_mapping(
@@ -35,3 +46,119 @@ def create_category_to_number_mapping(
       len(category_unique_values) + minimum_categorical_encoding_value,
   )
   return dict(zip(category_unique_values, encoding_range))
+
+
+def encode_categorical_value(
+    *,
+    row_value: str | int,
+    column_name: str | int,
+    category_mapping: Mapping[str | int, Mapping[str | int, int]],
+    unknown_categorical_encoding_value: int = -1,
+) -> int:
+  """Returns a encoded categorical value.
+
+  Args:
+    row_value: A categorical value to be encoded.
+    column_name: A categorical column name.
+    category_mapping: A mapping between categorical column names and their
+      unique values mapped to integers.
+    unknown_categorical_encoding_value: An integer to use when trying to encode
+      an unknown categorical value.
+  """
+  try:
+    return category_mapping[column_name][row_value]
+  except KeyError:
+    return unknown_categorical_encoding_value
+
+
+def verify_numerical_columns(
+    *, dataframe: pd.DataFrame, categorical_columns: Sequence[str | int]
+) -> None:
+  """Verifies that the numerical columns are of allowed types.
+
+  Args:
+    dataframe: A dataframe to preprocess.
+    categorical_columns: A sequence with categorical column names.
+  """
+  numerical_columns = list(
+      sorted(set(dataframe.columns.tolist()) - set(categorical_columns))
+  )
+  unallowed_numerical_dtypes = (
+      dataframe[numerical_columns]
+      .select_dtypes(include=_NON_NUMERICAL_PANDAS_DTYPES)
+      .dtypes.tolist()
+  )
+  if unallowed_numerical_dtypes:
+    raise TypeError(
+        "The specified / detected numerical columns are of unallowed types:"
+        f" {','.join(_NON_NUMERICAL_PANDAS_DTYPES)}.",
+    )
+
+
+class BaseDataPreprocessor:
+  """A class to preprocess a dataframe before using it with Optimus.
+
+  Attributes:
+    dataframe: A dataframe to preprocess.
+    categorical_column_threshold: A number of unique column values below which a
+      column will be classified as categorical. All the other columns will be
+      understood as numerical.
+    categorical_columns: A sequence with categorical column names.
+  """
+
+  def __init__(
+      self,
+      *,
+      dataframe: pd.DataFrame,
+      skip_columns: Sequence[str | int] | None = None,
+      override_categorical_columns: Sequence[str | int] | None = None,
+      categorical_column_threshold: int = 200,
+  ):
+    """Initializes the BaseDataPreprocessor class.
+
+    Args:
+      dataframe: A dataframe to preprocess.
+      skip_columns: A sequence with column names that should not be included in
+        the output.
+      override_categorical_columns: A sequence with categorical column names.
+      categorical_column_threshold: A number of unique column values below which
+        a column will be classified as categorical. All the other columns will
+        be understood as numerical.
+    """
+    self.dataframe = (
+        dataframe.drop(columns=skip_columns, inplace=False)
+        if skip_columns
+        else dataframe
+    )
+    self._override_categorical_columns = override_categorical_columns
+    self.categorical_column_threshold = categorical_column_threshold
+
+  @functools.cached_property
+  def categorical_columns(self) -> Sequence[str | int]:
+    """Returns a sequence with categorical column names."""
+    if self._override_categorical_columns:
+      missing_categorical_columns = list(
+          sorted(
+              set(self._override_categorical_columns)
+              - set(self.dataframe.columns.tolist())
+          )
+      )
+      if missing_categorical_columns:
+        raise ValueError(
+            "The categorical columns:"
+            f" {','.join(missing_categorical_columns)} are not present in the"
+            " dataframe.",
+        )
+      verify_numerical_columns(
+          dataframe=self.dataframe,
+          categorical_columns=self._override_categorical_columns,
+      )
+      return self._override_categorical_columns
+    unique_count = self.dataframe.nunique()
+    categorical_columns = unique_count[
+        unique_count < self.categorical_column_threshold
+    ].index.tolist()
+    verify_numerical_columns(
+        dataframe=self.dataframe, categorical_columns=categorical_columns
+    )
+    return categorical_columns

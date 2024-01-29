@@ -28,6 +28,7 @@ _TEST_DATAFRAME = pd.DataFrame({
     "c": [7, 8, 9],
     "d": [10, 11, 12],
 })
+_TEST_COLUMNS = ["a", "b", "c", "d"]
 
 
 class BasePreprocessingUtilityFunctionsTests(parameterized.TestCase):
@@ -68,50 +69,33 @@ class BasePreprocessingUtilityFunctionsTests(parameterized.TestCase):
           categorical_columns="b",
       )
 
+  def test_encode_categorical_columns(self):
+    actual_output = base_preprocessing.encode_categorical_columns(
+        categorical_array=np.asarray(["a", "b", "c"]),
+        categorical_columns=["column"],
+        categories_mappings={"column": {"a": 1, "b": 2}},
+    ).tolist()
+    self.assertEqual(actual_output, [1, 2, -1])
 
-class BasePreprocessingTests(parameterized.TestCase):
-
-  def test_skip_columns(self):
-    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+  def test_find_categorical_columns_from_dataframe(self):
+    actual_output = base_preprocessing.find_categorical_columns_from_dataframe(
         dataframe=_TEST_DATAFRAME,
-        skip_columns=["c", "d"],
-    )
-    self.assertEqual(base_preprocessor.dataframe.columns.tolist(), ["a", "b"])
-
-  @parameterized.named_parameters(
-      dict(
-          testcase_name="override_catergorical_columns",
-          override_categorical_columns=["a"],
-          result=["a"],
-      ),
-      dict(
-          testcase_name="no_override_catergorical_columns",
-          override_categorical_columns=None,
-          result=["a", "b"],
-      ),
-  )
-  def test_categorical_columns(self, override_categorical_columns, result):
-    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
-        dataframe=_TEST_DATAFRAME,
-        override_categorical_columns=override_categorical_columns,
         categorical_column_threshold=3,
     )
-    self.assertEqual(base_preprocessor.categorical_columns, result)
+    self.assertEqual(actual_output, ["a", "b"])
 
-  def test_categorical_columns_value_error(self):
-    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+  def test_find_categorical_columns_unique_values_from_dataframe(self):
+    actual_output = base_preprocessing.find_categorical_columns_unique_values_from_dataframe(
         dataframe=_TEST_DATAFRAME,
-        override_categorical_columns=["e"],
+        categorical_columns=["a", "b"],
     )
-    with self.assertRaisesRegex(ValueError, "are not present"):
-      _ = base_preprocessor.categorical_columns
+    self.assertEqual(actual_output, {"a": [1, 3], "b": [4, 6]})
 
-  def test_categorical_columns_indexes(self):
-    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
-        dataframe=_TEST_DATAFRAME,
-        override_categorical_columns=["a"],
+  def test_create_categories_mappings(self):
+    actual_output = base_preprocessing.create_categories_mappings(
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
     )
-    self.assertEqual(base_preprocessor.categorical_columns_indexes, [0])
+    self.assertEqual(actual_output, {"a": {1: 1, 3: 2}, "b": {4: 1, 6: 2}})
 
   def test_verify_override_mapping(self):
     with self.assertRaisesRegex(ValueError, "columns mappings must have keys"):
@@ -120,37 +104,119 @@ class BasePreprocessingTests(parameterized.TestCase):
           categorical_columns=["a", "b", "c"],
       )
 
+  def test_check_missing_arguments_unique_values(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "`categorical_columns_unique_values` or"
+        " `categorical_columns_unique_values_path` must be provided",
+    ):
+      base_preprocessing.check_missing_arguments(
+          categorical_columns=["a", "b"],
+          categorical_columns_unique_values=None,
+          categorical_columns_unique_values_path=None,
+          categorical_columns_encoding_mapping={
+              "a": {1: 1, 3: 2},
+              "b": {4: 1, 6: 2},
+          },
+          categorical_columns_encoding_mapping_path=None,
+      )
+
+  def test_check_missing_arguments_encoding_mapping(self):
+    with self.assertRaisesRegex(
+        ValueError,
+        "`categorical_columns_encoding_mapping` or"
+        " `categorical_columns_encoding_mapping_path` must be provided",
+    ):
+      base_preprocessing.check_missing_arguments(
+          categorical_columns=["a", "b"],
+          categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
+          categorical_columns_unique_values_path=None,
+          categorical_columns_encoding_mapping=None,
+          categorical_columns_encoding_mapping_path=None,
+      )
+
+
+class BasePreprocessingTests(parameterized.TestCase):
+
+  def test_categorical_columns(self):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        categorical_columns=["a", "b"],
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
+        categorical_columns_encoding_mapping={
+            "a": {1: 1, 3: 2},
+            "b": {4: 1, 6: 2},
+        },
+    )
+    self.assertEqual(base_preprocessor.categorical_columns, ["a", "b"])
+
+  def test_categorical_columns_value_error(self):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        categorical_columns=["a", "f"],
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
+        categorical_columns_encoding_mapping={
+            "a": {1: 1, 3: 2},
+            "b": {4: 1, 6: 2},
+        },
+    )
+    with self.assertRaisesRegex(ValueError, "are not present"):
+      _ = base_preprocessor.categorical_columns
+
+  @parameterized.named_parameters(
+      dict(
+          testcase_name="with_skip_columns",
+          skip_columns=["a"],
+          result=[0],
+      ),
+      dict(
+          testcase_name="without_skip_columns",
+          skip_columns=None,
+          result=[0, 1],
+      ),
+  )
+  def test_categorical_columns_indexes(self, skip_columns, result):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        skip_columns=skip_columns,
+        categorical_columns=["a", "b"],
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
+        categorical_columns_encoding_mapping={
+            "a": {1: 1, 3: 2},
+            "b": {4: 1, 6: 2},
+        },
+    )
+    self.assertEqual(
+        base_preprocessor.categorical_columns_indexes, result
+    )
+
   def test_categorical_columns_unique_values_from_file(self):
     mapping = {"a": [1, 3], "b": [4, 6]}
     file_path = os.path.join(self.create_tempdir().full_path, "mapping.pickle")
     with tf.io.gfile.GFile(file_path, "wb") as file:
       pickle.dump(mapping, file)
     base_preprocessor = base_preprocessing.BaseDataPreprocessor(
-        dataframe=_TEST_DATAFRAME,
+        columns=_TEST_COLUMNS,
+        categorical_columns=["a", "b"],
         categorical_columns_unique_values_path=file_path,
-        override_categorical_columns=["a", "b"],
+        categorical_columns_encoding_mapping={
+            "a": {1: 1, 3: 2},
+            "b": {4: 1, 6: 2},
+        },
     )
     self.assertEqual(
         base_preprocessor.categorical_columns_unique_values, mapping
     )
 
-  @parameterized.named_parameters(
-      dict(
-          testcase_name="override_categorical_columns_unique_values",
-          override_categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
-      ),
-      dict(
-          testcase_name="no_override_categorical_columns_unique_values",
-          override_categorical_columns_unique_values=None,
-      ),
-  )
-  def test_categorical_columns_unique_values(
-      self, override_categorical_columns_unique_values
-  ):
+  def test_categorical_columns_unique_values(self):
     base_preprocessor = base_preprocessing.BaseDataPreprocessor(
-        dataframe=_TEST_DATAFRAME,
-        override_categorical_columns_unique_values=override_categorical_columns_unique_values,
-        override_categorical_columns=["a", "b"],
+        columns=_TEST_COLUMNS,
+        categorical_columns=["a", "b"],
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
+        categorical_columns_encoding_mapping={
+            "a": {1: 1, 3: 2},
+            "b": {4: 1, 6: 2},
+        },
     )
     self.assertEqual(
         base_preprocessor.categorical_columns_unique_values,
@@ -159,10 +225,15 @@ class BasePreprocessingTests(parameterized.TestCase):
 
   def test_categorical_columns_dimensions(self):
     base_preprocessor = base_preprocessing.BaseDataPreprocessor(
-        dataframe=_TEST_DATAFRAME,
-        override_categorical_columns=["a"],
+        columns=_TEST_COLUMNS,
+        categorical_columns=["a", "b"],
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
+        categorical_columns_encoding_mapping={
+            "a": {1: 1, 3: 2},
+            "b": {4: 1, 6: 2},
+        },
     )
-    self.assertEqual(base_preprocessor.categorical_columns_dimensions, [2])
+    self.assertEqual(base_preprocessor.categorical_columns_dimensions, [2, 2])
 
   def test_categories_mappings_from_file(self):
     mapping = {"a": {1: 1, 3: 2}, "b": {4: 1, 6: 2}}
@@ -170,47 +241,42 @@ class BasePreprocessingTests(parameterized.TestCase):
     with tf.io.gfile.GFile(file_path, "wb") as file:
       pickle.dump(mapping, file)
     base_preprocessor = base_preprocessing.BaseDataPreprocessor(
-        dataframe=_TEST_DATAFRAME,
+        columns=_TEST_COLUMNS,
+        categorical_columns=["a", "b"],
         categorical_columns_encoding_mapping_path=file_path,
-        override_categorical_columns=["a", "b"],
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
     )
     self.assertEqual(base_preprocessor.categories_mappings, mapping)
 
-  @parameterized.named_parameters(
-      dict(
-          testcase_name="override_categorical_columns_encoding_mapping",
-          override_categorical_columns_encoding_mapping={
-              "column": {"a": 1, "b": 2}
-          },
-      ),
-      dict(
-          testcase_name="no_override_categorical_columns_encoding_mapping",
-          override_categorical_columns_encoding_mapping=None,
-      ),
-  )
-  def test_categories_mappings(
-      self, override_categorical_columns_encoding_mapping
-  ):
+  def test_categories_mappings(self):
+    mapping = {"a": {1: 1, 3: 2}, "b": {4: 1, 6: 2}}
     base_preprocessor = base_preprocessing.BaseDataPreprocessor(
-        dataframe=pd.DataFrame({"column": ["a", "b"]}),
-        override_categorical_columns_encoding_mapping=override_categorical_columns_encoding_mapping,
-        override_categorical_columns=["column"],
+        columns=_TEST_COLUMNS,
+        categorical_columns=["a", "b"],
+        categorical_columns_encoding_mapping=mapping,
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
     )
     self.assertEqual(
         base_preprocessor.categories_mappings,
-        {"column": {"a": 1, "b": 2}},
+        mapping,
     )
 
-  def test_preprocessed_array(self):
+  def test_preprocess_data(self):
     base_preprocessor = base_preprocessing.BaseDataPreprocessor(
-        dataframe=_TEST_DATAFRAME,
-        override_categorical_columns=["a", "b"],
+        columns=_TEST_COLUMNS,
+        categorical_columns=["a", "b"],
         skip_columns=["d"],
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
+        categorical_columns_encoding_mapping={
+            "a": {1: 1, 3: 2},
+            "b": {4: 1, 6: 2},
+        },
     )
+    actual_output = base_preprocessor.preprocess_data(
+        input_data=_TEST_DATAFRAME
+    ).tolist()
     expected_output = [[1.0, 1.0, 7.0], [1.0, 1.0, 8.0], [2.0, 2.0, 9.0]]
-    self.assertEqual(
-        base_preprocessor.preprocessed_array.tolist(), expected_output
-    )
+    self.assertEqual(actual_output, expected_output)
 
 
 if __name__ == "__main__":

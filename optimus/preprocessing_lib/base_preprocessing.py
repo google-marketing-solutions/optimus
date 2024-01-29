@@ -68,10 +68,41 @@ def encode_categorical_value(
     unknown_categorical_encoding_value: An integer to use when trying to encode
       an unknown categorical value.
   """
+  column_mapping = category_mapping[column_name]
   try:
-    return category_mapping[column_name][row_value]
+    return column_mapping[row_value]
   except KeyError:
     return unknown_categorical_encoding_value
+
+
+def encode_categorical_columns(
+    *,
+    categorical_array: np.ndarray,
+    categorical_columns: Sequence[str | int],
+    categories_mappings: Mapping[str | int, Mapping[str | int, int]],
+    unknown_categorical_encoding_value: int = -1,
+) -> np.ndarray:
+  """Returns an array with encoded categorical values from the dataframe.
+
+  Args:
+    categorical_array: An array with categorical columns only to preprocess.
+    categorical_columns: A sequence with categorical column names.
+    categories_mappings: A mapping between categorical column names and their
+      unique values mapped to integers.
+    unknown_categorical_encoding_value: An integer to use when trying to encode
+      an unknown categorical value.
+  """
+  vectorized_encoder = np.vectorize(
+      functools.partial(
+          encode_categorical_value,
+          category_mapping=categories_mappings,
+          unknown_categorical_encoding_value=unknown_categorical_encoding_value,
+      )
+  )
+  return vectorized_encoder(
+      row_value=categorical_array,
+      column_name=categorical_columns,
+  )
 
 
 def verify_numerical_columns(
@@ -82,6 +113,10 @@ def verify_numerical_columns(
   Args:
     dataframe: A dataframe to preprocess.
     categorical_columns: A sequence with categorical column names.
+
+  Raises:
+    TypeError: An error when the determined numerical column data types are not
+    allowed.
   """
   numerical_columns = list(
       sorted(set(dataframe.columns.tolist()) - set(categorical_columns))
@@ -94,7 +129,7 @@ def verify_numerical_columns(
   if unallowed_numerical_dtypes:
     raise TypeError(
         "The specified / detected numerical columns are of unallowed types:"
-        f" {','.join(_NON_NUMERICAL_PANDAS_DTYPES)}.",
+        f" {', '.join(_NON_NUMERICAL_PANDAS_DTYPES)}.",
     )
 
 
@@ -113,6 +148,10 @@ def verify_override_mapping(
       mapping of categorical columns to mappings of their unique values and
       representative integers.
     categorical_columns: A sequence with categorical column names.
+
+  Raises:
+    ValueError: An error when the categorical column name keys are not the same
+    as the provided sequence with the categorical column names.
   """
   all_categorical_columns = mapping.keys()
   if set(all_categorical_columns) != set(categorical_columns):
@@ -124,14 +163,128 @@ def verify_override_mapping(
     )
 
 
+def find_categorical_columns_from_dataframe(
+    dataframe: pd.DataFrame, categorical_column_threshold: int = 200
+) -> Sequence[str | int]:
+  """Returns a sequence with categorical column names.
+
+  Args:
+    dataframe: A dataframe with all the columns.
+    categorical_column_threshold: A number of unique column values below which a
+      column will be classified as categorical. All the other columns will be
+      understood as numerical.
+  """
+  unique_count = dataframe.nunique()
+  categorical_columns = unique_count[
+      unique_count < categorical_column_threshold
+  ].index.tolist()
+  verify_numerical_columns(
+      dataframe=dataframe, categorical_columns=categorical_columns
+  )
+  return categorical_columns
+
+
+def find_categorical_columns_unique_values_from_dataframe(
+    dataframe: pd.DataFrame, categorical_columns: Sequence[str | int]
+) -> Mapping[str | int, Sequence[str | int]]:
+  """Returns a mapping between categorical columns and their unique values.
+
+  Args:
+    dataframe: A dataframe with all the columns.
+    categorical_columns: A sequence with categorical column names.
+  """
+  categorical_dataframe = dataframe[categorical_columns].astype("category")
+  return {
+      column_name: column_values.cat.categories.values.tolist()
+      for column_name, column_values in categorical_dataframe.items()
+  }
+
+
+def create_categories_mappings(
+    categorical_columns_unique_values: Mapping[str | int, Sequence[str | int]],
+    minimum_categorical_encoding_value: int = 1,
+) -> Mapping[str | int, Mapping[str | int, int]]:
+  """Returns a mapping of categorical columns to mappings of their unique values and representative integers.
+
+  Args:
+    categorical_columns_unique_values: A mapping between categorical columns and
+      their unique values.
+    minimum_categorical_encoding_value: A minimum numerical value to use for
+      encoding. I.e. if 1 then the encoded values will begin at 1 and and on
+      number_of_unique_values + 1.
+  """
+  partial_create_category_to_number_mapping = functools.partial(
+      create_category_to_number_mapping,
+      minimum_categorical_encoding_value=minimum_categorical_encoding_value,
+  )
+  return {
+      key: partial_create_category_to_number_mapping(
+          category_unique_values=values,
+      )
+      for key, values in categorical_columns_unique_values.items()
+  }
+
+
+def check_missing_arguments(
+    *,
+    categorical_columns: Sequence[str | int] | None = None,
+    categorical_columns_unique_values: (
+        Mapping[str | int, Sequence[str | int]] | None
+    ) = None,
+    categorical_columns_unique_values_path: str | None = None,
+    categorical_columns_encoding_mapping: (
+        Mapping[str | int, Mapping[str | int, int]] | None
+    ) = None,
+    categorical_columns_encoding_mapping_path: str | None = None,
+) -> None:
+  """Checks if all required arguments were provided.
+
+  Args:
+    categorical_columns: A sequence with categorical column names.
+    categorical_columns_unique_values: A mapping between column names and their
+      unique values.
+    categorical_columns_unique_values_path: A path to a pickle file with a
+      mapping between column names and their unique values. The
+      `categorical_columns_unique_values` argument has priority if both are
+      provided.
+    categorical_columns_encoding_mapping: A mapping of categorical column names
+      to mappings between their unique and encoded values.
+    categorical_columns_encoding_mapping_path: A path to a pickle file with a
+      mapping of categorical columns to mappings of their unique values and
+      representative integers.
+
+  Raises:
+    ValueError: An error is there are any missing required values for the
+    BaseDataPreprocessor class initialization.
+  """
+  if categorical_columns:
+    if (
+        not categorical_columns_unique_values
+        and not categorical_columns_unique_values_path
+    ):
+      raise ValueError(
+          "`categorical_columns_unique_values` or"
+          " `categorical_columns_unique_values_path` must be provided if"
+          " `categorical_columns` is provided."
+      )
+    if (
+        not categorical_columns_encoding_mapping
+        and not categorical_columns_encoding_mapping_path
+    ):
+      raise ValueError(
+          "`categorical_columns_encoding_mapping` or"
+          " `categorical_columns_encoding_mapping_path` must be provided if"
+          " `categorical_columns` is provided."
+      )
+
+
 class BaseDataPreprocessor:
   """A class to preprocess a dataframe before using it with Optimus.
 
   Attributes:
-    dataframe: A dataframe to preprocess.
-    categorical_column_threshold: A number of unique column values below which a
-      column will be classified as categorical. All the other columns will be
-      understood as numerical.
+    columns: A sequence with all the columns in the dataframe.
+    skip_columns: A sequence with column names that should not be included in
+      the output.
     categorical_columns: A sequence with categorical column names.
     categorical_columns_indexes: A sequence with categorical column indexes.
     categorical_columns_unique_values: A mapping between categorical columns and
@@ -140,124 +293,121 @@ class BaseDataPreprocessor:
       per categorical column
     categories_mappings: A mapping of categorical columns to mappings of their
       unique values and representative integers.
-    preprocessed_array: An array with all the preprocessed dataframe values.
-    minimum_categorical_encoding_value: A minimum numerical value to use for
-      encoding. I.e. if 1 then the encoded values will begin at 1 and and on
-      number_of_unique_values + 1.
-    unknown_categorical_encoding_value: An integer to use when trying to encode
-      an unknown categorical value.
   """
 
   def __init__(
       self,
       *,
-      dataframe: pd.DataFrame,
+      columns: Sequence[str | int],
       skip_columns: Sequence[str | int] | None = None,
-      override_categorical_columns: Sequence[str | int] | None = None,
-      categorical_column_threshold: int = 200,
-      override_categorical_columns_unique_values: (
+      categorical_columns: Sequence[str | int] | None = None,
+      categorical_columns_unique_values: (
           Mapping[str | int, Sequence[str | int]] | None
       ) = None,
       categorical_columns_unique_values_path: str | None = None,
-      override_categorical_columns_encoding_mapping: (
+      categorical_columns_encoding_mapping: (
           Mapping[str | int, Mapping[str | int, int]] | None
       ) = None,
       categorical_columns_encoding_mapping_path: str | None = None,
-      minimum_categorical_encoding_value: int = 1,
       unknown_categorical_encoding_value: int = -1,
   ):
     """Initializes the BaseDataPreprocessor class.
 
     Args:
-      dataframe: A dataframe to preprocess.
+      columns: A sequence with all the columns in the dataframe.
       skip_columns: A sequence with column names that should not be included in
         the output.
-      override_categorical_columns: A sequence with categorical column names.
-      categorical_column_threshold: A number of unique column values below which
-        a column will be classified as categorical. All the other columns will
-        be understood as numerical.
-      override_categorical_columns_unique_values: A mapping between column names
-        and their unique values.
+      categorical_columns: A sequence with categorical column names.
+      categorical_columns_unique_values: A mapping between column names and
+        their unique values.
       categorical_columns_unique_values_path: A path to a pickle file with a
         mapping between column names and their unique values. The
-        `override_categorical_columns_unique_values` argument has priority if
-        both are provided.
-      override_categorical_columns_encoding_mapping: A mapping of categorical
-        column names to mappings between their unique and encoded values.
+        `categorical_columns_unique_values` argument has priority if both are
+        provided.
+      categorical_columns_encoding_mapping: A mapping of categorical column
+        names to mappings between their unique and encoded values.
       categorical_columns_encoding_mapping_path: A path to a pickle file with a
         mapping of categorical columns to mappings of their unique values and
         representative integers.
-      minimum_categorical_encoding_value: A minimum numerical value to use for
-        encoding. I.e. if 1 then the encoded values will begin at 1 and and on
-        number_of_unique_values + 1.
       unknown_categorical_encoding_value: An integer to use when trying to
         encode an unknown categorical value.
     """
-    self.dataframe = (
-        dataframe.drop(columns=skip_columns, inplace=False)
-        if skip_columns
-        else dataframe
+    check_missing_arguments(
+        categorical_columns=categorical_columns,
+        categorical_columns_unique_values=categorical_columns_unique_values,
+        categorical_columns_unique_values_path=categorical_columns_unique_values_path,
+        categorical_columns_encoding_mapping=categorical_columns_encoding_mapping,
+        categorical_columns_encoding_mapping_path=categorical_columns_encoding_mapping_path,
     )
-    self._override_categorical_columns = override_categorical_columns
-    self.categorical_column_threshold = categorical_column_threshold
+    self.columns = columns
+    self.skip_columns = skip_columns
+    self._override_categorical_columns = categorical_columns
     self._override_categorical_columns_unique_values = (
-        override_categorical_columns_unique_values
+        categorical_columns_unique_values
     )
     self._categorical_columns_unique_values_path = (
         categorical_columns_unique_values_path
     )
     self._override_categorical_columns_encoding_mapping = (
-        override_categorical_columns_encoding_mapping
+        categorical_columns_encoding_mapping
     )
     self._categorical_columns_encoding_mapping_path = (
         categorical_columns_encoding_mapping_path
     )
-    self.minimum_categorical_encoding_value = minimum_categorical_encoding_value
-    self.unknown_categorical_encoding_value = unknown_categorical_encoding_value
-
-  @functools.cached_property
-  def categorical_columns(self) -> Sequence[str | int]:
-    """Returns a sequence with categorical column names."""
-    if self._override_categorical_columns:
-      missing_categorical_columns = list(
-          sorted(
-              set(self._override_categorical_columns)
-              - set(self.dataframe.columns.tolist())
-          )
-      )
-      if missing_categorical_columns:
-        raise ValueError(
-            "The categorical columns:"
-            f" {','.join(missing_categorical_columns)} are not present in the"
-            " dataframe.",
-        )
-      verify_numerical_columns(
-          dataframe=self.dataframe,
-          categorical_columns=self._override_categorical_columns,
-      )
-      return self._override_categorical_columns
-    unique_count = self.dataframe.nunique()
-    categorical_columns = unique_count[
-        unique_count < self.categorical_column_threshold
-    ].index.tolist()
-    verify_numerical_columns(
-        dataframe=self.dataframe, categorical_columns=categorical_columns
+    self._unknown_categorical_encoding_value = (
+        unknown_categorical_encoding_value
     )
-    return categorical_columns
 
   @functools.cached_property
-  def categorical_columns_indexes(self) -> Sequence[int]:
+  def categorical_columns(self) -> Sequence[str | int] | None:
+    """Returns a sequence with categorical column names.
+    
+    Raises:
+      ValueError: An error when any provided categorical column name is not
+      present in the list with all column names.
+    """
+    if not self._override_categorical_columns:
+      return None
+    missing_categorical_columns = list(
+        sorted(set(self._override_categorical_columns) - set(self.columns))
+    )
+    if missing_categorical_columns:
+      raise ValueError(
+          "The categorical columns:"
+          f" {', '.join(missing_categorical_columns)} are not present in the"
+          " dataframe.",
+      )
+    return self._override_categorical_columns
+
+  @functools.cached_property
+  def categorical_columns_indexes(self) -> Sequence[int] | None:
     """Returns a sequence with categorical column indexes."""
+    if not self.categorical_columns:
+      return None
+    if not self.skip_columns:
+      columns = self.columns
+      categorical_columns = self.categorical_columns
+    else:
+      columns = [
+          column for column in self.columns
+          if column not in self.skip_columns
+      ]
+      categorical_columns = [
+          column for column in self.categorical_columns
+          if column not in self.skip_columns
+      ]
     return [
-        self.dataframe.columns.tolist().index(categorical_column)
-        for categorical_column in self.categorical_columns
+        columns.index(categorical_column)
+        for categorical_column in categorical_columns
     ]
 
   @functools.cached_property
   def categorical_columns_unique_values(
       self,
-  ) -> Mapping[str | int, Sequence[str | int]]:
+  ) -> Mapping[str | int, Sequence[str | int]] | None:
     """Returns a mapping between categorical columns and their unique values."""
+    if not self.categorical_columns:
+      return None
     if self._override_categorical_columns_unique_values:
       verify_override_mapping(
           mapping=self._override_categorical_columns_unique_values,
@@ -273,17 +423,12 @@ class BaseDataPreprocessor:
             mapping=mapping, categorical_columns=self.categorical_columns
         )
         return mapping
-    categorical_dataframe = self.dataframe[self.categorical_columns].astype(
-        "category"
-    )
-    return {
-        column_name: column_values.cat.categories.values.tolist()
-        for column_name, column_values in categorical_dataframe.items()
-    }
 
   @functools.cached_property
-  def categorical_columns_dimensions(self) -> Sequence[int]:
+  def categorical_columns_dimensions(self) -> Sequence[int] | None:
     """Returns the number of unique values per categorical column."""
+    if not self.categorical_columns:
+      return None
     return [
         len(self.categorical_columns_unique_values[categorical_column])
         for categorical_column in self.categorical_columns
@@ -292,8 +437,10 @@ class BaseDataPreprocessor:
   @functools.cached_property
   def categories_mappings(
       self,
-  ) -> Mapping[str | int, Mapping[str | int, int]]:
+  ) -> Mapping[str | int, Mapping[str | int, int]] | None:
     """Returns a mapping of categorical columns, unique and encoded values."""
+    if not self.categorical_columns:
+      return None
     if self._override_categorical_columns_encoding_mapping:
       verify_override_mapping(
           mapping=self._override_categorical_columns_encoding_mapping,
@@ -309,37 +456,36 @@ class BaseDataPreprocessor:
             mapping=mapping, categorical_columns=self.categorical_columns
         )
         return mapping
-    partial_create_category_to_number_mapping = functools.partial(
-        create_category_to_number_mapping,
-        minimum_categorical_encoding_value=self.minimum_categorical_encoding_value,
-    )
-    return {
-        key: partial_create_category_to_number_mapping(
-            category_unique_values=values,
-        )
-        for key, values in self.categorical_columns_unique_values.items()
-    }
 
   @functools.cached_property
-  def _encoded_categorical_columns(self) -> np.ndarray:
-    """Returns an array with encoded categorical values from the dataframe."""
-    vectorized_encoder = np.vectorize(
-        functools.partial(
-            encode_categorical_value,
-            category_mapping=self.categories_mappings,
-            unknown_categorical_encoding_value=self.unknown_categorical_encoding_value,
-        )
-    )
-    return vectorized_encoder(
-        row_value=self.dataframe[self.categorical_columns].values,
-        column_name=self.categorical_columns,
-    )
+  def _skip_columns_indexes(self) -> Sequence[int]:
+    """Returns the indexes of the skip columns."""
+    if not self.skip_columns:
+      return []
+    return sorted([self.columns.index(column) for column in self.skip_columns])
 
-  @functools.cached_property
-  def preprocessed_array(self) -> np.ndarray:
-    """Returns an array with all the preprocessed dataframe values."""
-    data_array = self.dataframe.to_numpy()
-    data_array[:, self.categorical_columns_indexes] = (
-        self._encoded_categorical_columns
-    )
-    return data_array.astype(np.float32)
+  def preprocess_data(
+      self,
+      *,
+      input_data: np.ndarray,
+  ) -> np.ndarray:
+    """Returns an array with all the preprocessed dataframe values.
+
+    Args:
+      input_data: The input dataframe to preprocess.
+    """
+    if self._skip_columns_indexes:
+      input_data = np.delete(input_data, self._skip_columns_indexes, axis=1)
+    if self.categorical_columns:
+      encoded_categorical_columns = encode_categorical_columns(
+          categorical_array=input_data[:, self.categorical_columns_indexes],
+          categorical_columns=self.categorical_columns,
+          categories_mappings=self.categories_mappings,
+          unknown_categorical_encoding_value=self._unknown_categorical_encoding_value,
+      )
+      input_data[:, self.categorical_columns_indexes] = (
+          encoded_categorical_columns
+      )
+    if len(input_data.shape) != 2:
+      input_data = np.expand_dims(input_data, axis=0)
+    return input_data.astype(np.float32, copy=False)

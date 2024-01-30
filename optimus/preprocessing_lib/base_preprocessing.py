@@ -56,7 +56,7 @@ def encode_categorical_value(
     row_value: str | int,
     column_name: str | int,
     category_mapping: Mapping[str | int, Mapping[str | int, int]],
-    unknown_categorical_encoding_value: int = -1,
+    unknown_categorical_encoding_value: int = 0,
 ) -> int:
   """Returns a encoded categorical value.
 
@@ -80,7 +80,7 @@ def encode_categorical_columns(
     categorical_array: np.ndarray,
     categorical_columns: Sequence[str | int],
     categories_mappings: Mapping[str | int, Mapping[str | int, int]],
-    unknown_categorical_encoding_value: int = -1,
+    unknown_categorical_encoding_value: int = 0,
 ) -> np.ndarray:
   """Returns an array with encoded categorical values from the dataframe.
 
@@ -309,7 +309,7 @@ class BaseDataPreprocessor:
           Mapping[str | int, Mapping[str | int, int]] | None
       ) = None,
       categorical_columns_encoding_mapping_path: str | None = None,
-      unknown_categorical_encoding_value: int = -1,
+      unknown_categorical_encoding_value: int = 0,
   ):
     """Initializes the BaseDataPreprocessor class.
 
@@ -430,7 +430,7 @@ class BaseDataPreprocessor:
     if not self.categorical_columns:
       return None
     return [
-        len(self.categorical_columns_unique_values[categorical_column])
+        len(self.categorical_columns_unique_values[categorical_column]) + 1
         for categorical_column in self.categorical_columns
     ]
 

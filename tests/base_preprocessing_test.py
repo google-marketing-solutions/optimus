@@ -48,7 +48,7 @@ class BasePreprocessingUtilityFunctionsTests(parameterized.TestCase):
       dict(
           testcase_name="unknown_value",
           row_value="b",
-          result=-1,
+          result=0,
       ),
   )
   def test_encode_categorical_value(self, row_value, result):
@@ -75,7 +75,7 @@ class BasePreprocessingUtilityFunctionsTests(parameterized.TestCase):
         categorical_columns=["column"],
         categories_mappings={"column": {"a": 1, "b": 2}},
     ).tolist()
-    self.assertEqual(actual_output, [1, 2, -1])
+    self.assertEqual(actual_output, [1, 2, 0])
 
   def test_find_categorical_columns_from_dataframe(self):
     actual_output = base_preprocessing.find_categorical_columns_from_dataframe(
@@ -233,7 +233,7 @@ class BasePreprocessingTests(parameterized.TestCase):
             "b": {4: 1, 6: 2},
         },
     )
-    self.assertEqual(base_preprocessor.categorical_columns_dimensions, [2, 2])
+    self.assertEqual(base_preprocessor.categorical_columns_dimensions, [3, 3])
 
   def test_categories_mappings_from_file(self):
     mapping = {"a": {1: 1, 3: 2}, "b": {4: 1, 6: 2}}

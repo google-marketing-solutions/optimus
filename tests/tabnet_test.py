@@ -35,7 +35,7 @@ _TEST_TABNET_HYPERPARAMETERS = config_dict.ConfigDict(
         prediction_layer_dimension=8,
         attention_layer_dimension=8,
         successive_network_steps=3,
-        categorical_embedding_dimensions=1,
+        categorical_embedding_dimensions=[1],
         independent_glu_layers=2,
         shared_glu_layers=2,
         epsilon=1e-15,
@@ -67,7 +67,7 @@ class EmbeddingGeneratorTest(parameterized.TestCase):
           testcase_name="categorical_dimensions_or_categorical_indexes_is_none",
           categorical_dimensions=(1, 2),
           categorical_indexes=None,
-          categorical_embedding_dimensions=1,
+          categorical_embedding_dimensions=(1,),
           error_message=(
               "categorical_dimensions and categorical_indexes are required"
           ),
@@ -79,7 +79,7 @@ class EmbeddingGeneratorTest(parameterized.TestCase):
           ),
           categorical_dimensions=(1, 2),
           categorical_indexes=(1,),
-          categorical_embedding_dimensions=1,
+          categorical_embedding_dimensions=(1,),
           error_message="categorical_dimensions and categorical_indexes must",
       ),
       dict(
@@ -123,7 +123,7 @@ class EmbeddingGeneratorTest(parameterized.TestCase):
           testcase_name="without_categorical_dimensions_or_categorical_indexes",
           categorical_dimensions=None,
           categorical_indexes=None,
-          categorical_embedding_dimensions=1,
+          categorical_embedding_dimensions=(1,),
       ),
       dict(
           testcase_name=(
@@ -131,7 +131,7 @@ class EmbeddingGeneratorTest(parameterized.TestCase):
           ),
           categorical_dimensions=(1,),
           categorical_indexes=(2,),
-          categorical_embedding_dimensions=1,
+          categorical_embedding_dimensions=(1,),
       ),
       dict(
           testcase_name="categorical_embedding_dimensions_as_tuple",
@@ -696,10 +696,11 @@ class TabNetPretrainingTest(parameterized.TestCase):
   def test_tabnet_pretraining_not_train(self):
     rng_key, bernoulli_key = jax.random.split(jax.random.PRNGKey(0))
     rng_keys = {"params": rng_key, "bernoulli_rng": bernoulli_key}
-    input_x = jnp.array([[[1, 2], [1, 2]]], dtype=jnp.float32)
+    input_x = jnp.array([[1, 2], [1, 2]], dtype=jnp.float32)
     tabnet_pretraining = tabnet.TabNetPretraining(
         input_dimensions=2,
         virtual_batch_size=2,
+        categorical_embedding_dimensions=None,
     )
     parameters = tabnet_pretraining.init(rngs=rng_keys, input_x=input_x)
     actual_output = tabnet_pretraining.apply(
@@ -707,12 +708,11 @@ class TabNetPretrainingTest(parameterized.TestCase):
         input_x=input_x,
         rngs={"bernoulli_rng": bernoulli_key},
     )
-    print(actual_output[0])
     self.assertTrue(
         jnp.allclose(
             actual_output[0],
             jnp.array(
-                [[0.07065069, 0.06271993], [0.06871776, 0.13796571]],
+                [[0.06562408, 0.1289592], [0.06562408, 0.1289592]],
                 dtype=jnp.float32,
             ),
         )
@@ -721,10 +721,11 @@ class TabNetPretrainingTest(parameterized.TestCase):
   def test_tabnet_pretraining_train(self):
     rng_key, bernoulli_key = jax.random.split(jax.random.PRNGKey(0))
     rng_keys = {"params": rng_key, "bernoulli_rng": bernoulli_key}
-    input_x = jnp.array([[[1, 2], [1, 2]]], dtype=jnp.float32)
+    input_x = jnp.array([[1, 2], [1, 2]], dtype=jnp.float32)
     tabnet_pretraining = tabnet.TabNetPretraining(
         input_dimensions=2,
         virtual_batch_size=2,
+        categorical_embedding_dimensions=None,
     )
     parameters = tabnet_pretraining.init(rngs=rng_keys, input_x=input_x)
     actual_output, _ = tabnet_pretraining.apply(
@@ -738,7 +739,7 @@ class TabNetPretrainingTest(parameterized.TestCase):
         jnp.allclose(
             actual_output[0],
             jnp.array(
-                [[5.0447197, 0.20411597], [-3.159074, 0.66698855]],
+                [[0.0, 0.0], [0.0, 0.0]],
                 dtype=jnp.float32,
             ),
             atol=1e-05,

@@ -42,7 +42,7 @@ DEFAULT_HYPERPARAMETERS = config_dict.ConfigDict(
         prediction_layer_dimension=8,
         attention_layer_dimension=8,
         successive_network_steps=3,
-        categorical_embedding_dimensions=3,
+        categorical_embedding_dimensions=[3],
         independent_glu_layers=2,
         shared_glu_layers=2,
         epsilon=1e-15,
@@ -53,7 +53,7 @@ DEFAULT_HYPERPARAMETERS = config_dict.ConfigDict(
         independent_decoder_layers=1,
         model_data_type="float32",
         agent_name="tabnet",
-        replace_nans_in_prediction=True,
+        replace_nans_in_prediction=False,
     )
 )
 
@@ -71,14 +71,59 @@ class EmbeddingGenerator(nn.Module):
       list of int, every corresponding feature will have specific size.
     model_data_type: Data type to use within the model.
     embedding_initializer: Embeddings initializer.
+    post_embedding_dimension: The post embedding dimension.
   """
 
   input_dimensions: int
   categorical_dimensions: tuple[int, ...] | None = None
   categorical_indexes: tuple[int, ...] | None = None
-  categorical_embedding_dimensions: tuple[int, ...] | int = 1
+  categorical_embedding_dimensions: tuple[int, ...] | None = None
   model_data_type: jnp.dtype = jnp.float32
   embedding_initializer: Any = nn.initializers.normal(stddev=1**0.5)
+
+  @functools.cached_property
+  def _sorted_categorical_indexes(self) -> tuple[int, ...]:
+    """Returns the sorted_indexes."""
+    if self.categorical_indexes:
+      return tuple([
+          self.categorical_indexes.index(i)
+          for i in sorted(self.categorical_indexes)
+      ])
+    else:
+      raise ValueError("There is no categorical_indexes to sort.")
+
+  @functools.cached_property
+  def _verified_categorical_embedding_dimensions(
+      self,
+  ) -> tuple[int, ...] | None:
+    """Returns the verified_categorical_embedding_dimensions."""
+    if len(self.categorical_embedding_dimensions) == 1:
+      categorical_embedding_dimensions = (
+          self.categorical_embedding_dimensions * len(self.categorical_indexes)
+      )
+    else:
+      categorical_embedding_dimensions = self.categorical_embedding_dimensions
+    if len(categorical_embedding_dimensions) != len(
+        self.categorical_dimensions
+    ):
+      raise ValueError(
+          "categorical_embedding_dimensions and categorical_dimensions must"
+          " be lists of same length, got"
+          f" {len(self.categorical_embedding_dimensions)} and"
+          f" {len(self.categorical_dimensions)}"
+      )
+    return categorical_embedding_dimensions
+
+  @functools.cached_property
+  def post_embedding_dimension(self) -> int:
+    """Returns the post embedding dimension."""
+    if not self.categorical_dimensions and not self.categorical_indexes:
+      return self.input_dimensions
+    return (
+        self.input_dimensions
+        + sum(self._verified_categorical_embedding_dimensions)
+        - len(self._verified_categorical_embedding_dimensions)
+    )
 
   def setup(self) -> None:
     """Sets up the module definition when it's called.
@@ -88,11 +133,10 @@ class EmbeddingGenerator(nn.Module):
       categorical_indexes. Or when length of categorical_embedding_dimensions
       is not equal to categorical_dimensions.
     """
-    if self.categorical_dimensions is None and self.categorical_indexes is None:
+    if not self.categorical_dimensions and not self.categorical_indexes:
       self.skip_embedding = True
-      self.post_embed_dim = self.input_dimensions
       return
-    if self.categorical_dimensions is None or self.categorical_indexes is None:
+    if not self.categorical_dimensions or not self.categorical_indexes:
       raise ValueError(
           "Both categorical_dimensions and categorical_indexes "
           "are required if there are categorical columns."
@@ -103,50 +147,34 @@ class EmbeddingGenerator(nn.Module):
           " the same length."
       )
     self.skip_embedding = False
-    if isinstance(self.categorical_embedding_dimensions, int):
-      cat_emb_dims = [self.categorical_embedding_dimensions] * len(
-          self.categorical_indexes
-      )
-    else:
-      cat_emb_dims = self.categorical_embedding_dimensions
-    if len(cat_emb_dims) != len(self.categorical_dimensions):
-      raise ValueError(
-          "categorical_embedding_dimensions and categorical_dimensions must"
-          " be lists of same length, got"
-          f" {len(self.categorical_embedding_dimensions)} and"
-          f" {len(self.categorical_dimensions)}"
-      )
-    self.post_embed_dim = (
-        self.input_dimensions + sum(cat_emb_dims) - len(cat_emb_dims)
-    )
-    sorted_idxs = [
-        self.categorical_indexes.index(i)
-        for i in sorted(self.categorical_indexes)
-    ]
     categorical_dimensions = [
-        self.categorical_dimensions[i] for i in sorted_idxs
+        self.categorical_dimensions[i] for i in self._sorted_categorical_indexes
     ]
-    cat_emb_dims = [cat_emb_dims[i] for i in sorted_idxs]
-
+    embedding = functools.partial(
+        nn.Embed,
+        embedding_init=self.embedding_initializer,
+        dtype=self.model_data_type,
+    )
+    processed_categorical_embedding_dimensions = [
+        self._verified_categorical_embedding_dimensions[i]
+        for i in self._sorted_categorical_indexes
+    ]
     self.embeddings = [
-        nn.Embed(
-            num_embeddings=cat_dim,
-            features=emb_dim,
-            embedding_init=self.embedding_initializer,
-            dtype=self.model_data_type,
+        embedding(
+            num_embeddings=categorical_dimensions + 1,
+            features=embedding_dimensions,
         )
-        for cat_dim, emb_dim in zip(categorical_dimensions, cat_emb_dims)
+        for categorical_dimensions, embedding_dimensions in zip(
+            categorical_dimensions,
+            processed_categorical_embedding_dimensions,
+        )
     ]
-
-    if self.categorical_indexes is None:
-      self.continuous_idx = [1 for _ in range(self.input_dimensions)]
-    else:
-      self.continuous_idx = [
-          0
-          if i in self.categorical_indexes
-          else 1
-          for i in range(self.input_dimensions)
-      ]
+    self.continuous_indexes = [
+        0
+        if i in self.categorical_indexes
+        else 1
+        for i in range(self.input_dimensions)
+    ]
 
   @nn.compact
   def __call__(self, *, input_x: jnp.ndarray) -> jnp.ndarray:
@@ -166,10 +194,12 @@ class EmbeddingGenerator(nn.Module):
       return input_x
     columns = []
     categorical_feature_counter = 0
-    for feat_init_idx, is_continuous in enumerate(self.continuous_idx):
+    for feature_initial_index, is_continuous in enumerate(
+        self.continuous_indexes
+    ):
       if is_continuous:
         output = jnp.array(
-            input_x[:, feat_init_idx], self.model_data_type
+            input_x[:, feature_initial_index], self.model_data_type
         ).reshape(-1, 1)
         columns.append(output)
       else:
@@ -178,7 +208,9 @@ class EmbeddingGenerator(nn.Module):
               "There're more categorical features than embedding layers."
           )
         embedding_layer = self.embeddings[categorical_feature_counter]
-        embedding_input = jnp.array(input_x[:, feat_init_idx], dtype=jnp.int32)
+        embedding_input = jnp.array(
+            input_x[:, feature_initial_index], dtype=jnp.int32
+        )
         embedding_output = embedding_layer(inputs=embedding_input)
         columns.append(embedding_output)
         categorical_feature_counter += 1
@@ -970,7 +1002,7 @@ class TabNetPretraining(nn.Module):
   attention_gamma: float = 1.3
   categorical_dimensions: tuple[int, ...] | None = None
   categorical_indexes: tuple[int, ...] | None = None
-  categorical_embedding_dimensions: tuple[int, ...] | int = 1
+  categorical_embedding_dimensions: tuple[int, ...] | None = None
   independent_glu_layers: int = 2
   shared_glu_layers: int = 2
   epsilon: float = 1e-15
@@ -1001,9 +1033,9 @@ class TabNetPretraining(nn.Module):
         categorical_dimensions,
         categorical_indexes,
         self.categorical_embedding_dimensions,
-        model_data_type=self.model_data_type,
+        self.model_data_type,
     )
-    self.post_embed_dim = self.embedder.post_embed_dim
+    self.post_embed_dim = self.embedder.post_embedding_dimension
     self.masker = RandomObfuscator(self.pretraining_ratio)
     self.encoder = TabNetEncoder(
         input_dimensions=self.post_embed_dim,
@@ -1225,7 +1257,7 @@ class TabNet(nn.Module):
   attention_gamma: float = 1.3
   categorical_dimensions: tuple[int, ...] | None = None
   categorical_indexes: tuple[int, ...] | None = None
-  categorical_embedding_dimensions: tuple[int, ...] | int = 1
+  categorical_embedding_dimensions: tuple[int, ...] | None = None
   independent_glu_layers: int = 2
   shared_glu_layers: int = 2
   epsilon: float = 1e-15
@@ -1261,7 +1293,7 @@ class TabNet(nn.Module):
         self.categorical_embedding_dimensions,
         self.model_data_type,
     )
-    self.post_embed_dim = self.embedder.post_embed_dim
+    self.post_embed_dim = self.embedder.post_embedding_dimension
     self.tabnet = TabNetCoreTraining(
         input_dimensions=self.post_embed_dim,
         output_dimensions=self.output_dimensions,

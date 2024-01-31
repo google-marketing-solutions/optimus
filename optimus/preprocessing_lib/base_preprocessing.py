@@ -471,11 +471,13 @@ class BaseDataPreprocessor:
       *,
       input_data: np.ndarray,
   ) -> np.ndarray:
-    """Returns an array with all the preprocessed dataframe values.
+    """Returns an array with the preprocessed values from the input array.
 
     Args:
-      input_data: The input dataframe to preprocess.
+      input_data: The input array to preprocess.
     """
+    if len(input_data.shape) != 2:
+      raise ValueError("`input_data` must be a 2-D array.")
     if self._skip_columns_indexes:
       input_data = np.delete(input_data, self._skip_columns_indexes, axis=1)
     if self.categorical_columns:
@@ -488,9 +490,11 @@ class BaseDataPreprocessor:
       input_data[:, self.categorical_columns_indexes] = (
           encoded_categorical_columns
       )
-    if len(input_data.shape) != 2:
-      input_data = np.expand_dims(input_data, axis=0)
-    if np.isnan(input_data).any():
-      input_data = np.nan_to_num(input_data, nan=_NAN_SUBSTITUTE)
-      logging.warning("NaN value(s) were detected and replaced with 0.0.")
-    return input_data.astype(np.float32, copy=False)
+    output = input_data.astype(np.float32, copy=False)
+    if np.isnan(output).any():
+      output = np.nan_to_num(output, nan=_NAN_SUBSTITUTE)
+      logging.warning(
+          "NaN value(s) were detected and replaced with %s.",
+          str(_NAN_SUBSTITUTE),
+      )
+    return output

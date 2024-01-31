@@ -278,6 +278,22 @@ class BasePreprocessingTests(parameterized.TestCase):
     expected_output = [[1.0, 1.0, 7.0], [1.0, 1.0, 8.0], [2.0, 2.0, 9.0]]
     self.assertEqual(actual_output, expected_output)
 
+  def test_preprocess_data_value_error(self):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        categorical_columns=["a", "b"],
+        skip_columns=["d"],
+        categorical_columns_unique_values={"a": [1, 3], "b": [4, 6]},
+        categorical_columns_encoding_mapping={
+            "a": {1: 1, 3: 2},
+            "b": {4: 1, 6: 2},
+        },
+    )
+    with self.assertRaisesRegex(ValueError, "2-D array"):
+      _ = base_preprocessor.preprocess_data(
+          input_data=np.asarray([1, 2])
+      )
+
 
 if __name__ == "__main__":
   absltest.main()

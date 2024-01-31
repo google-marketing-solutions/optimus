@@ -14,6 +14,7 @@
 
 """Base preprocessing class."""
 import functools
+import logging
 import pickle
 from typing import Final, List, Mapping, Sequence
 import numpy as np
@@ -28,6 +29,7 @@ _NON_NUMERICAL_PANDAS_DTYPES: Final[List[str]] = [
     "category",
     "datetimetz",
 ]
+_NAN_SUBSTITUTE: Final[float] = 0.0
 
 
 def create_category_to_number_mapping(
@@ -361,7 +363,7 @@ class BaseDataPreprocessor:
   @functools.cached_property
   def categorical_columns(self) -> Sequence[str | int] | None:
     """Returns a sequence with categorical column names.
-    
+
     Raises:
       ValueError: An error when any provided categorical column name is not
       present in the list with all column names.
@@ -389,11 +391,11 @@ class BaseDataPreprocessor:
       categorical_columns = self.categorical_columns
     else:
       columns = [
-          column for column in self.columns
-          if column not in self.skip_columns
+          column for column in self.columns if column not in self.skip_columns
       ]
       categorical_columns = [
-          column for column in self.categorical_columns
+          column
+          for column in self.categorical_columns
           if column not in self.skip_columns
       ]
     return [
@@ -488,4 +490,7 @@ class BaseDataPreprocessor:
       )
     if len(input_data.shape) != 2:
       input_data = np.expand_dims(input_data, axis=0)
+    if np.isnan(input_data).any():
+      input_data = np.nan_to_num(input_data, nan=_NAN_SUBSTITUTE)
+      logging.warning("NaN value(s) were detected and replaced with 0.0.")
     return input_data.astype(np.float32, copy=False)

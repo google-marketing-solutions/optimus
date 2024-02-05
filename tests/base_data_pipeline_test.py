@@ -35,6 +35,7 @@ _TEST_BASE_DATA_PIPELINE_HYPERPARAMETERS = config_dict.ConfigDict(
         train_steps=1,
         sign_rewards=True,
         training_rng_seed=0,
+        reactions_dimensions=1,
     )
 )
 _TRAIN_DATA = np.asarray([[0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]])

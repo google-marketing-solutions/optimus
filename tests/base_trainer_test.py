@@ -103,6 +103,7 @@ _TEST_BASE_TRAINER_HYPERPARAMETERS = config_dict.ConfigDict(
         number_of_epochs=1,
         action_space_length=1,
         replace_nans_in_prediction=True,
+        reactions_dimensions=1,
     )
 )
 

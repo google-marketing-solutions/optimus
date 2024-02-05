@@ -35,6 +35,7 @@ DEFAULT_HYPERPARAMETERS = config_dict.ConfigDict(
         evaluation_batch_size=8,
         train_dataset_size=config_dict.placeholder(int),
         data_pipeline_name="base_data_pipeline",
+        reactions_dimensions=1,
     )
 )
 
@@ -75,7 +76,18 @@ def process_data(
         dones_tensor,
         attentive_transformer_losses_tensor,
         reactions_tensor,
-    ) = tf.split(tensor, [hyperparameters.input_dimensions, 1, 1, 1, 1, 1, 1])
+    ) = tf.split(
+        tensor,
+        [
+            hyperparameters.input_dimensions,
+            1,
+            1,
+            1,
+            1,
+            1,
+            hyperparameters.reactions_dimensions,
+        ],
+    )
     rewards_tensor = reward_calculation_function(
         actions_tensor,
         reactions_tensor,

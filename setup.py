@@ -58,7 +58,7 @@ _INSTALL_REQUIREMENTS: Final[str] = _parse_requirements(
 
 
 setuptools.setup(
-    name="optimus",
+    name="gtech-optimus",
     version=_VERSION,
     python_requires=">=3.10",
     description=(

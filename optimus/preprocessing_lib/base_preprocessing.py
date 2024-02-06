@@ -36,7 +36,8 @@ def create_category_to_number_mapping(
     *,
     category_unique_values: Sequence[str | int],
     minimum_categorical_encoding_value: int = 1,
-) -> Mapping[str | int, int]:
+    classes_encoding: bool = False,
+) -> Mapping[str | int, int] | Mapping[int, str | int]:
   """Returns a mapping between unique column values and numerical values.
 
   Args:
@@ -45,12 +46,16 @@ def create_category_to_number_mapping(
     minimum_categorical_encoding_value: A minimum numerical value to use for
       encoding. I.e. if 1 then the encoded values will begin at 1 and and on
       number_of_unique_values + 1.
+    classes_encoding: An indicator whether the encoding is for the features or
+      classes.
   """
   encoding_range = range(
       minimum_categorical_encoding_value,
       len(category_unique_values) + minimum_categorical_encoding_value,
   )
-  return dict(zip(category_unique_values, encoding_range))
+  if not classes_encoding:
+    return dict(zip(category_unique_values, encoding_range))
+  return dict(zip(encoding_range, category_unique_values))
 
 
 def encode_categorical_value(
@@ -291,10 +296,13 @@ class BaseDataPreprocessor:
     categorical_columns_indexes: A sequence with categorical column indexes.
     categorical_columns_unique_values: A mapping between categorical columns and
       their unique values.
-    categorical_columns_dimensions: A seuqnce with the number of unique values
+    categorical_columns_dimensions: A sequence with the number of unique values
       per categorical column
     categories_mappings: A mapping of categorical columns to mappings of their
       unique values and representative integers.
+    output_classes: A sequence with unique labels. I.e. when a model predicts an
+      action as a class.
+    output_classes_encoding: A mapping between encodings and output classes.
   """
 
   def __init__(
@@ -311,6 +319,9 @@ class BaseDataPreprocessor:
           Mapping[str | int, Mapping[str | int, int]] | None
       ) = None,
       categorical_columns_encoding_mapping_path: str | None = None,
+      output_classes: Sequence[int | str] | None = None,
+      output_classes_encoding_path: str | None = None,
+      action_space: int | None = None,
       unknown_categorical_encoding_value: int = 0,
   ):
     """Initializes the BaseDataPreprocessor class.
@@ -331,6 +342,11 @@ class BaseDataPreprocessor:
       categorical_columns_encoding_mapping_path: A path to a pickle file with a
         mapping of categorical columns to mappings of their unique values and
         representative integers.
+      output_classes: A sequence with unique labels. I.e. when a model predicts
+        an action as a class.
+      output_classes_encoding_path: A path to a pickle file with a mapping
+        between unique actions (i.e. classes) and their encodings.
+      action_space: A number of actions available to the Optimus model.
       unknown_categorical_encoding_value: An integer to use when trying to
         encode an unknown categorical value.
     """
@@ -356,6 +372,9 @@ class BaseDataPreprocessor:
     self._categorical_columns_encoding_mapping_path = (
         categorical_columns_encoding_mapping_path
     )
+    self._override_output_classes = output_classes
+    self._output_classes_encoding_path = output_classes_encoding_path
+    self._action_space = action_space
     self._unknown_categorical_encoding_value = (
         unknown_categorical_encoding_value
     )
@@ -474,7 +493,10 @@ class BaseDataPreprocessor:
     """Returns an array with the preprocessed values from the input array.
 
     Args:
-      input_data: The input array to preprocess.
+      input_data: An input array to preprocess.
+
+    Raises:
+      ValueError: An error when the input data is not a 2-D array.
     """
     if len(input_data.shape) != 2:
       raise ValueError("`input_data` must be a 2-D array.")
@@ -498,3 +520,59 @@ class BaseDataPreprocessor:
           str(_NAN_SUBSTITUTE),
       )
     return output
+
+  @functools.cached_property
+  def output_classes_encoding(
+      self,
+  ) -> Mapping[str | int, int] | Mapping[int, str | int]:
+    """Returns a mapping between encodings and output classes.
+
+    Raises:
+      ValueError: An error when both `output_classes` or
+      `output_classes_encoding_path` are not provided at the class
+      initialization. Or if `action_space` is not provided at the class
+      initialization.
+    """
+    if self._override_output_classes:
+      output_classes_encoding = create_category_to_number_mapping(
+          category_unique_values=self.output_classes,
+          minimum_categorical_encoding_value=0,
+          classes_encoding=True,
+      )
+    elif self._output_classes_encoding_path:
+      with tf.io.gfile.GFile(
+          self._output_classes_encoding_path, "rb"
+      ) as artifact:
+        output_classes_encoding = pickle.load(artifact)
+    else:
+      raise ValueError(
+          "`output_classes` or `output_classes_encoding_path` must be provided"
+          " at the class initialization if you try to access"
+          " `output_classes_encoding`."
+      )
+    if not self._action_space:
+      raise ValueError(
+          "`action_space` must be provided at the class initialization."
+      )
+    if len(output_classes_encoding) != self._action_space:
+      raise ValueError(
+          "The length of the encoding mapping is not the same as the action"
+          f" space, {len(output_classes_encoding)} != {self._action_space}."
+      )
+    return output_classes_encoding
+
+  @functools.cached_property
+  def output_classes(self) -> Sequence[int | str] | None:
+    if self._override_output_classes:
+      return list(sorted(set(self._override_output_classes)))
+    return list(sorted(set(self.output_classes_encoding.values())))
+
+  def postprocess_data(self, input_data: np.ndarray) -> list[str | int]:
+    """Returns an array with the postprocessed values from the input array.
+
+    Args:
+      input_data: An input array to postprocess.
+    """
+    return np.vectorize(
+        lambda x: self.output_classes_encoding[x], otypes=[object]
+    )(input_data).tolist()

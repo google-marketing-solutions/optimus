@@ -33,11 +33,24 @@ _TEST_COLUMNS = ["a", "b", "c", "d"]
 
 class BasePreprocessingUtilityFunctionsTests(parameterized.TestCase):
 
-  def test_create_category_to_number_mapping(self):
+  @parameterized.named_parameters(
+      dict(
+          testcase_name="not_classes",
+          classes_encoding=False,
+          result={"a": 1, "b": 2, "c": 3, "d": 4},
+      ),
+      dict(
+          testcase_name="classes",
+          classes_encoding=True,
+          result={1: "a", 2: "b", 3: "c", 4: "d"},
+      ),
+  )
+  def test_create_category_to_number_mapping(self, classes_encoding, result):
     actual_output = base_preprocessing.create_category_to_number_mapping(
         category_unique_values=["a", "b", "c", "d"],
+        classes_encoding=classes_encoding,
     )
-    self.assertEqual(actual_output, {"a": 1, "b": 2, "c": 3, "d": 4})
+    self.assertEqual(actual_output, result)
 
   @parameterized.named_parameters(
       dict(
@@ -186,9 +199,7 @@ class BasePreprocessingTests(parameterized.TestCase):
             "b": {4: 1, 6: 2},
         },
     )
-    self.assertEqual(
-        base_preprocessor.categorical_columns_indexes, result
-    )
+    self.assertEqual(base_preprocessor.categorical_columns_indexes, result)
 
   def test_categorical_columns_unique_values_from_file(self):
     mapping = {"a": [1, 3], "b": [4, 6]}
@@ -290,9 +301,79 @@ class BasePreprocessingTests(parameterized.TestCase):
         },
     )
     with self.assertRaisesRegex(ValueError, "2-D array"):
-      _ = base_preprocessor.preprocess_data(
-          input_data=np.asarray([1, 2])
-      )
+      _ = base_preprocessor.preprocess_data(input_data=np.asarray([1, 2]))
+
+  def test_output_classes_encoding_output_classes(self):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        output_classes=["a", "b", "c"],
+        action_space=3,
+    )
+    self.assertEqual(
+        base_preprocessor.output_classes_encoding, {0: "a", 1: "b", 2: "c"}
+    )
+
+  def test_output_classes_encoding_output_classes_encoding_path(self):
+    mapping = {0: "a", 1: "b", 2: "c"}
+    file_path = os.path.join(self.create_tempdir().full_path, "mapping.pickle")
+    with tf.io.gfile.GFile(file_path, "wb") as file:
+      pickle.dump(mapping, file)
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        output_classes_encoding_path=file_path,
+        action_space=3,
+    )
+    self.assertEqual(base_preprocessor.output_classes_encoding, mapping)
+
+  def test_output_classes_encoding_value_error(self):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+    )
+    with self.assertRaisesRegex(ValueError, "must be provided"):
+      _ = base_preprocessor.output_classes_encoding
+
+  def test_output_classes_encoding_value_error_action_space(
+      self,
+  ):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        output_classes=["a", "b", "c"],
+    )
+    with self.assertRaisesRegex(
+        ValueError, "`action_space` must be provided"
+    ):
+      _ = base_preprocessor.output_classes_encoding
+
+  def test_output_classes_output_classes(self):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        output_classes=["a", "b", "c"],
+        action_space=3,
+    )
+    self.assertEqual(base_preprocessor.output_classes, ["a", "b", "c"])
+
+  def test_output_classes_output_classes_encoding_path(self):
+    mapping = {0: "a", 1: "b", 2: "c"}
+    file_path = os.path.join(self.create_tempdir().full_path, "mapping.pickle")
+    with tf.io.gfile.GFile(file_path, "wb") as file:
+      pickle.dump(mapping, file)
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        output_classes_encoding_path=file_path,
+        action_space=3,
+    )
+    self.assertEqual(base_preprocessor.output_classes, ["a", "b", "c"])
+
+  def test_postprocess_data(self):
+    base_preprocessor = base_preprocessing.BaseDataPreprocessor(
+        columns=_TEST_COLUMNS,
+        output_classes=["a", "b", "c"],
+        action_space=3,
+    )
+    actual_output = base_preprocessor.postprocess_data(
+        input_data=np.asarray([[0]])
+    )
+    self.assertEqual(actual_output, [["a"]])
 
 
 if __name__ == "__main__":

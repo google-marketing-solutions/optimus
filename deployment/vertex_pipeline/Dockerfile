@@ -20,6 +20,4 @@ ENV VERTEX_PIPELINE_DOCKER_IMAGE_NAME $VERTEX_PIPELINE_DOCKER_IMAGE_NAME
 
 COPY . .
 
-RUN pip install --require-hashes --upgrade pip
-
 RUN pip install --require-hashes -r requirements.txt

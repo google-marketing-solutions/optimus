@@ -45,8 +45,6 @@ WORKDIR $CLOUD_RUN_APP_HOME_DIRECTORY
 COPY requirements.txt $CLOUD_RUN_APP_HOME_DIRECTORY/
 
 # Installing production dependencies
-RUN pip install --require-hashes --upgrade pip
-
 RUN pip install --require-hashes -r $CLOUD_RUN_APP_HOME_DIRECTORY/requirements.txt
 
 # Copying the rest of the project files.

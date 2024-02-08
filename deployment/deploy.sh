@@ -14,7 +14,6 @@
 
 echo "Starting deploying Optimus on GCP."
 echo "1/18 Installing Python packages required for deployment."
-pip install --upgrade pip
 pip install --require-hashes -q --upgrade --force-reinstall -r requirements.txt --no-cache-dir
 echo "2/18 Setting up environmental variables."
 python -m setup.environmental_variables -user_environmental_variables_path=$USER_ENVIRONMETAL_VARIABLES_PATH

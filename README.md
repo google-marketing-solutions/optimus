@@ -344,6 +344,8 @@ If the dataset is not available, then the best way is to track rewards that an a
 *Iconographic 2. Proposed Optimus implementation on Google Cloud Platform for real-time marketing personalization.*
 ![Alt text](images/proposed_gcp_implementation_architecture.png?raw=true)
 
+Read the `deplyment_instructions.pdf` file from the `deployment` directory for the detailed manual on how to deploy Optimus on GCP using the provided deployment templates.
+
 # References
 
 1. Arik, Sercan, et al. “TabNet: Attentive Interpretable Tabular Learning.” arXiv.org, 9 Dec. 2020, arxiv.org/abs/1908.07442.

@@ -35,6 +35,15 @@ import tensorflow as tf
 _BUILDING_BLOCKS = {}
 
 
+def verify_path(*, path: str) -> str | None:
+  """Returns the path if it exists, otherwise None.
+
+  Args:
+    path: A path to be verified.
+  """
+  return path if tf.io.gfile.exists(path) else None
+
+
 @contextlib.asynccontextmanager
 
 
@@ -97,20 +106,19 @@ async def lifespan(app: fastapi.FastAPI) -> None:
   )
   optimus_data_preprocessor = base_preprocessing.BaseDataPreprocessor(
       columns=column_metadata.all_columns,
-      skip_columns=column_metadata.skipped_columns,
-      categorical_columns=column_metadata.categorical_columns,
-      categorical_columns_unique_values_path=categorical_columns_unique_values_path,
-      categorical_columns_encoding_mapping_path=categorical_columns_encoding_mapping_path,
-      output_classes_encoding_path=output_classes_encoding_path,
+      skip_columns=column_metadata.get("skipped_columns", None),
+      categorical_columns=column_metadata.get("categorical_columns", None),
+      categorical_columns_unique_values_path=verify_path(
+          path=categorical_columns_unique_values_path
+      ),
+      categorical_columns_encoding_mapping_path=verify_path(
+          path=categorical_columns_encoding_mapping_path
+      ),
+      output_classes_encoding_path=verify_path(
+          path=output_classes_encoding_path
+      ),
       action_space=hyperparameters.action_space,
   )
-  # Preloading the key class attrbutes
-  _ = optimus_data_preprocessor._skip_columns_indexes
-  _ = optimus_data_preprocessor.categorical_columns
-  _ = optimus_data_preprocessor.categorical_columns_indexes
-  _ = optimus_data_preprocessor.categories_mappings
-  _ = optimus_data_preprocessor._unknown_categorical_encoding_value
-  _ = optimus_data_preprocessor.output_classes_encoding
   _BUILDING_BLOCKS["preprocessor"] = optimus_data_preprocessor
   yield
   _BUILDING_BLOCKS.clear()

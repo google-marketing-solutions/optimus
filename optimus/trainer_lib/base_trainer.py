@@ -183,11 +183,14 @@ def calculate_train_step_metrics(
     exploration_exploitation_rate: A exploration_exploitation_rate schedule.
     hyperparameters: Experiment hyperparameters.
   """
-  alpha = (
-      1.0 - step / hyperparameters.train_steps
-      if hyperparameters.clip_parameters
-      else 1.0
-  )
+  if step / hyperparameters.train_steps < 1.0:
+    denominator = step / hyperparameters.train_steps
+  else:
+    denominator = 1.0
+  if hyperparameters.clip_parameters:
+    alpha = 1.0 - denominator
+  else:
+    alpha = 1.0
   clip_parameters_coefficient = (
       hyperparameters.clip_parameters_coefficient * alpha
   )

@@ -49,4 +49,8 @@ def trigger_vertex_pipeline(*args, **kwargs) -> None:
       enable_caching=False,
       parameter_values=parameter_values,
   )
-  job.submit()
+  job.submit(
+      service_account=(
+          f"{os.getenv('PROJECT_NUMBER')}-compute@developer.gserviceaccount.com"
+      )
+  )

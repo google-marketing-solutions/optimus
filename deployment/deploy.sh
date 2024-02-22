@@ -40,13 +40,13 @@ gcloud services enable compute.googleapis.com \
 echo "5/18 Setting up Artifact Registry."
 gcloud artifacts repositories create $ARTIFACT_REGISTRY_NAME --repository-format=docker --location=$REGION
 yes | gcloud auth configure-docker $REGION-docker.pkg.dev
-echo "6/18 Setting up GCS buckets."
+echo "6/18 Creating GCS buckets."
 gcloud storage buckets create gs://$DEPLOYMENT_BUCKET_NAME --location=$REGION
 gcloud storage buckets create gs://$DATA_BUCKET_NAME --location=$REGION
+echo "7/18 Setting up GCP permissions."
 gsutil iam ch serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com:roles/storage.objectAdmin gs://$DEPLOYMENT_BUCKET_NAME
 gsutil iam ch serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com:roles/storage.objectAdmin gs://$DATA_BUCKET_NAME
-echo "7/18 Setting up GCP permissions."
-gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:service-$PROJECT_NUMBER@gcp-sa-aiplatform-cc.iam.gserviceaccount.com --role=roles/aiplatform.user
+gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:$PROJECT_NUMBER-compute@developer.gserviceaccount.com --role=roles/aiplatform.user
 gcloud projects add-iam-policy-binding $PROJECT_ID --member=serviceAccount:service-$PROJECT_NUMBER@gcp-sa-aiplatform-cc.iam.gserviceaccount.com --role=roles/artifactregistry.reader
 echo "8/18 Creating metadata for the input data."
 python -m setup.columns_metadata
@@ -120,7 +120,8 @@ gcloud functions deploy $CLOUD_FUNCTION_NAME --region $REGION \
 --docker-registry=artifact-registry \
 --update-build-env-vars GOOGLE_VENDOR_PIP_DEPENDENCIES=wheel_dependencies/ \
 --run-service-account projects/$PROJECT_ID/serviceAccounts/$PROJECT_NUMBER-compute@developer.gserviceaccount.com \
---set-env-vars DATA_BUCKET_NAME=$DATA_BUCKET_NAME,ARTIFACT_DIRECTORY_PATH=$ARTIFACT_DIRECTORY_PATH,TRAINING_LOGS_DIRECTORY_PATH=$TRAINING_LOGS_DIRECTORY_PATH,PROJECT_ID=$PROJECT_ID,REGION=$REGION,VERTEX_PIPELINE_NAME=$VERTEX_PIPELINE_NAME,VERTEX_PIPELINE_PACKAGE_PATH=$VERTEX_PIPELINE_PACKAGE_PATH,VERTEX_PIPELINE_ROOT=$VERTEX_PIPELINE_ROOT
+--service-account $PROJECT_NUMBER-compute@developer.gserviceaccount.com \
+--set-env-vars DATA_BUCKET_NAME=$DATA_BUCKET_NAME,ARTIFACT_DIRECTORY_PATH=$ARTIFACT_DIRECTORY_PATH,TRAINING_LOGS_DIRECTORY_PATH=$TRAINING_LOGS_DIRECTORY_PATH,PROJECT_ID=$PROJECT_ID,REGION=$REGION,VERTEX_PIPELINE_NAME=$VERTEX_PIPELINE_NAME,VERTEX_PIPELINE_PACKAGE_PATH=$VERTEX_PIPELINE_PACKAGE_PATH,VERTEX_PIPELINE_ROOT=$VERTEX_PIPELINE_ROOT,PROJECT_NUMBER=$PROJECT_NUMBER
 sudo rm -R wheel_dependencies
 cd ..
 sudo rm optimus.env

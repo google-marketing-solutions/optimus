@@ -936,9 +936,9 @@ toolz==0.12.1 \
     --hash=sha256:d22731364c07d72eea0a0ad45bafb2c2937ab6fd38a3507bf55eae8744aa7d85 \
     --hash=sha256:ecca342664893f177a13dac0e6b41cbd8ac25a358e5f215316d43e2100224f4d
     # via chex
-tqdm==4.66.1 \
-    --hash=sha256:d302b3c5b53d47bce91fea46679d9c3c6508cf6332229aa1e7d8653723793386 \
-    --hash=sha256:d88e651f9db8d8551a62556d3cff9e3034274ca5d66e93197cf2490e2dcb69c7
+tqdm==4.66.3 \
+    --hash=sha256:23097a41eba115ba99ecae40d06444c15d1c0c698d527a01c6c8bd1c5d0647e5 \
+    --hash=sha256:4f41d54107ff9a223dca80b53efe4fb654c67efaba7f47bada3ee9d50e05bd53
     # via gtech-optimus
 typing-extensions==4.9.0 \
     --hash=sha256:23478f88c37f27d76ac8aee6c905017a143b0b1b886c3c9f66bc2fd94f9f5783 \

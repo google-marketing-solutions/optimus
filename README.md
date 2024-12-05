@@ -209,7 +209,7 @@ hyperparameters = training_setup.set_hyperparameters(
 
 	The calculate_reward method is used in the online training pipeline and needs to be written in [TensorFlow](https://github.com/tensorflow/tensorflow). It takes 3 inputs: `actions`, `reactions` and `sign_reward`. The first is the action taken by Optimus for a given observation. The second is a Tensor with data on how an end user reacted to that action. The content of that Tensor is use case specific, e.g. it can be a boolean, e.g. indicating a conversion or it can also contain a range of other measurements relevant to the optimization goal. The last parameter controls if the final reward value should be signed meaning contained between -1 and 1.
 
-	Specifying any reward calculation logic in the calculate_pretrain_reward is needed only when the Optimus model is going to be pretrained and needs to be written with [JAX](https://github.com/google/jax). Optimus would typically be pretrained if there is an already existing dataset with contextual data, actions taken (e.g. manually or by a rule-based algorithm) and outcomes. A separate AI/ML model could be trained on that data to predict rewards based on contextual data and actions taken by Optimus. And those predicted rewards could be used in the calculate_pretrain_reward method (see [Pretraining](#pretraining) section).
+	Specifying any reward calculation logic in the calculate_pretrain_reward is needed only when the Optimus model is going to be pretrained and needs to be written with [JAX](https://github.com/jax-ml/jax). Optimus would typically be pretrained if there is an already existing dataset with contextual data, actions taken (e.g. manually or by a rule-based algorithm) and outcomes. A separate AI/ML model could be trained on that data to predict rewards based on contextual data and actions taken by Optimus. And those predicted rewards could be used in the calculate_pretrain_reward method (see [Pretraining](#pretraining) section).
 
 ```
 class DemoReward(base_reward.BaseReward):
@@ -266,7 +266,7 @@ model_state = base_trainer.initialize_model_state_for_prediction(
 )
 ```
 
-3. Make a prediction using the initialized model state, a prediction seed and contextual data. Note that the contextual data needs to be encoded and in the form of a [JAX](https://github.com/google/jax) or [NumPy](https://github.com/numpy/numpy) array. The action from the prediction output will be a numerical value. In the majority of use cases that value will need to be interpreted before passing to any downstream systems. For instance, a use case could be whether to show or not to show a discount to a user at checkout. 0 could be mapped to “Yes” and 1 to “No”.
+3. Make a prediction using the initialized model state, a prediction seed and contextual data. Note that the contextual data needs to be encoded and in the form of a [JAX](https://github.com/jax-ml/jax) or [NumPy](https://github.com/numpy/numpy) array. The action from the prediction output will be a numerical value. In the majority of use cases that value will need to be interpreted before passing to any downstream systems. For instance, a use case could be whether to show or not to show a discount to a user at checkout. 0 could be mapped to “Yes” and 1 to “No”.
 
 ```
 prediction_output = agent.predict(
@@ -293,7 +293,7 @@ trainer = trainers.get_trainer(trainer_name=_TRAINER_NAME)(
 )
 ```
 
-2. Run pretraining. Note that the train and evaluation data (optional) need to be already encoded and in the form of a [JAX](https://github.com/google/jax) or [NumPy](https://github.com/numpy/numpy) array.
+2. Run pretraining. Note that the train and evaluation data (optional) need to be already encoded and in the form of a [JAX](https://github.com/jax-ml/jax) or [NumPy](https://github.com/numpy/numpy) array.
 
 ```
 model_state = trainer.pretrain(
@@ -315,7 +315,7 @@ data_pipeline = data_pipelines.get_data_pipeline(
 )(hyperparameters=hyperparameters)
 ```
 
-3. Initialize train and evaluation (optional) pipelines. The train data pipeline requires passing the reward calculation callable from the previously initialized reward class. from the Note that the train and evaluation data (optional) need to be already encoded and in the form of a [JAX](https://github.com/google/jax) or [NumPy](https://github.com/numpy/numpy) array.
+3. Initialize train and evaluation (optional) pipelines. The train data pipeline requires passing the reward calculation callable from the previously initialized reward class. from the Note that the train and evaluation data (optional) need to be already encoded and in the form of a [JAX](https://github.com/jax-ml/jax) or [NumPy](https://github.com/numpy/numpy) array.
 
 ```
 train_data_pipeline = data_pipeline.train_data_pipeline(

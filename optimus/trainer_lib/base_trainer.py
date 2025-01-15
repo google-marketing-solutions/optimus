@@ -500,13 +500,13 @@ def restore_model_state(
   if transforms is None:
     transforms = {}
   transforms["step"] = orbax.checkpoint.Transform()
-  restore_keyword_arguments = dict(
-      restore_args=restore_arguments, transforms=transforms
-  )
   return checkpoint_manager.restore(
       step=checkpoint_manager.latest_step(),
-      restore_kwargs=restore_keyword_arguments,
-      items=model_state,
+      args=orbax.checkpoint.args.PyTreeRestore(
+          model_state,
+          restore_args=restore_arguments,
+          transforms=transforms,
+      ),
       directory=hyperparameters.checkpoint_directory,
   )
 

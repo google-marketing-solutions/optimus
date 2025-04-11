@@ -29,6 +29,8 @@ from optimus.agent_lib import base_agent
 from optimus.reward_lib import base_reward
 from optimus.trainer_lib import base_trainer
 
+jax.config.update("jax_threefry_partitionable", False)
+
 
 _TEST_BASE_AGENT_HYPERPARAMETERS = config_dict.ConfigDict(
     dict(

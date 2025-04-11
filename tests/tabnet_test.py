@@ -24,6 +24,8 @@ import optax
 from optimus.agent_lib import base_agent
 from optimus.agent_lib import tabnet
 
+jax.config.update("jax_threefry_partitionable", False)
+
 _TEST_TABNET_HYPERPARAMETERS = config_dict.ConfigDict(
     dict(
         action_space=1,

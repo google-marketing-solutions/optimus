@@ -1,4 +1,9 @@
-# gTech Ads Optimus for Reinforcement Learning
+
+# **IMPORTANT NOTE: Optimus is retired and this project is no longer maintained by Google. **
+[![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
+## gTech Ads Optimus for Reinforcement Learning
 ### Optimus is an open-source Python library that makes it easy to use state-of-the-art Reinforcement Learning algorithms with tabular data.
 ##### This is not an official Google product.
 

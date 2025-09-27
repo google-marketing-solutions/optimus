@@ -489,7 +489,8 @@ class BaseTrainerUtilityFunctionsTests(parameterized.TestCase):
         type(pmapped_train_step).__name__,
         type(pmapped_evaluation_step).__name__,
     ]
-    self.assertEqual(actual_output, ["PmapFunction", "PmapFunction"])
+    if not jax.config.jax_pmap_shmap_merge:
+      self.assertEqual(actual_output, ["PmapFunction", "PmapFunction"])
 
   @parameterized.named_parameters(
       dict(

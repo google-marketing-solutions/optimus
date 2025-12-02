@@ -768,9 +768,9 @@ watchdog==4.0.0 \
     # via
     #   -r requirements.in
     #   functions-framework
-werkzeug==3.0.2 \
-    --hash=sha256:3aac3f5da756f93030740bc235d3e09449efcf65f2f55e3602e1d851b8f48795 \
-    --hash=sha256:e39b645a6ac92822588e7b39a692e7828724ceae0b0d702ef96701f90e70128d
+werkzeug==3.1.4 \
+    --hash=sha256:2ad50fb9ed09cc3af22c54698351027ace879a0b60a3b5edf5730b2f7d876905 \
+    --hash=sha256:cd3cd98b1b92dc3b7b3995038826c68097dcb16f9baa63abe35f20eafeb9fe5e
     # via
     #   -r requirements.in
     #   flask
